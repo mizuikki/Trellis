@@ -24,8 +24,8 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 | `prd.md` | Requirements, constraints, and acceptance criteria. Lightweight tasks may be PRD-only. |
 | `design.md` | Technical design for complex tasks: boundaries, contracts, data flow, compatibility, tradeoffs. |
 | `implement.md` | Execution plan for complex tasks: ordered checklist, validation commands, review gates, rollback points. |
-| `implement.jsonl` | List of spec/research files the implement agent must read first. |
-| `check.jsonl` | List of spec/research files the check agent must read first. |
+| `implement.jsonl` | Candidate spec/research index for implementation; reasons guide on-demand selection. |
+| `check.jsonl` | Candidate spec/research index for checking; reasons guide on-demand selection. |
 | `research/` | Research artifacts. Complex findings should not live only in chat. |
 
 ## `task.json`
@@ -87,7 +87,7 @@ If the platform or shell environment has no stable session identity, `task.py st
 
 ## JSONL Context
 
-`implement.jsonl` and `check.jsonl` are context manifests for sub-agents to read first. They do not replace `implement.md`; `implement.md` is the human-readable execution plan.
+`implement.jsonl` and `check.jsonl` are candidate context indexes. Sub-agents inspect reasons, select relevant sources, and prefer targeted or ranged reads for large files instead of loading every entry wholesale. They do not replace `implement.md`; `implement.md` is the human-readable execution plan.
 
 Format:
 
