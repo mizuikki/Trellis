@@ -21,6 +21,72 @@ All lists (backup dirs, template dirs, platform detection, cleanup whitelist) ar
 
 ---
 
+## Scenario: Bounded Sub-Agent Task Context
+
+### 1. Scope / Trigger
+
+Apply this contract whenever a platform hook, plugin, extension, or agent prelude turns an active task's `implement.jsonl` / `check.jsonl` and task artifacts into model-visible context.
+
+### 2. Signatures
+
+- Input: repository root, active task directory, and agent role.
+- Manifest rows: `file` or legacy `path`, optional `type: "directory"`, and optional `reason`.
+- Output: task identity, a metadata-only manifest index, bounded task artifacts, and path-bearing limit notices.
+
+### 3. Contracts
+
+- Referenced file and directory bodies stay on disk. The index exposes a POSIX repository-relative path, bounded reason, entry type, and available size/revision/status metadata.
+- Default limits are 128 KiB aggregate context, 64 KiB per task artifact, 32 KiB per rendered index, 256 KiB per manifest source read, and 256 rendered entries.
+- Measure rendered limits in UTF-8 bytes and never emit a broken trailing code point.
+- Preserve active-task resolution, hook markers, prompt routing, cache/session behavior, seed rows, malformed rows, duplicates, missing paths, unreadable paths, and legacy row forms as non-fatal inputs.
+- Pull-based agents use each entry's reason to select sources on demand and prefer targeted search or ranged reads for large files.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected behavior |
+| --- | --- |
+| Manifest references a large file | Render metadata only; never inline its body. |
+| Artifact, index, source, entry, or aggregate limit is exceeded | Stay within the limit and emit a UTF-8-safe notice naming the affected path or manifest and how to load the remainder. |
+| Row is seed, blank, malformed, duplicate, outside the repository, missing, or unreadable | Skip or render non-fatal status metadata as appropriate; context assembly continues. |
+| Row is a directory | Render `type: directory`; do not recursively expand children. |
+| Platform cannot preserve the common contract | Keep that platform change out of the release rather than shipping a mixed eager/bounded contract. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a multi-megabyte referenced spec contributes only path, reason, type, and metadata; selected sources remain readable on demand.
+- Base: a small PRD and seed-only manifest produce bounded task artifacts without an error.
+- Bad: iterating manifest rows and concatenating `readFile*()` results into the initial prompt.
+
+### 6. Tests Required
+
+- Behavior tests for the shared Python hook, Pi, OMP, and OpenCode using oversized UTF-8 artifacts, manifests, and referenced files.
+- Assert every byte/entry ceiling, every path-bearing notice, metadata discoverability, and absence of a marker stored only in a referenced body.
+- Cover file/directory/legacy paths, seed/malformed/duplicate/missing entries, repository-boundary rejection, and aggregate truncation.
+- Regression-test generated push and pull agent guidance so it uses reason-based on-demand selection and never requires wholesale manifest expansion.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```typescript
+for (const row of manifestRows) {
+  context.push(readFileSync(resolve(root, row.file), "utf8"));
+}
+```
+
+Correct:
+
+```typescript
+for (const row of boundedManifestRows) {
+  index.push(renderMetadata(row));
+}
+return truncateUtf8([index, ...boundedArtifacts].join("\n\n"), totalLimit, notice);
+```
+
+Keep the observable contract aligned across standalone Python, JavaScript, and TypeScript templates; shared source code is not required when platform runtimes differ.
+
+---
+
 ## Checklist: Adding a New Platform
 
 When adding a new platform `{platform}`, update the following:

@@ -153,8 +153,9 @@ For teams using Cursor, here's how to get partial Trellis benefits:
    - Run `task.py current --source`
 
 2. Before Implementation
-   - Read implement.jsonl for session files
-   - Manually read each file listed
+   - Read implement.jsonl as a candidate index
+   - Use entry reasons to select relevant sources and read them on demand
+   - Prefer targeted search or ranged reads for large sources
    - Follow spec guidelines
 
 3. Before Commit

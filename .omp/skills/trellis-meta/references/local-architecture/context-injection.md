@@ -9,7 +9,7 @@ Trellis context injection aims to make AI read the right files at the right time
 | session context | `.trellis/scripts/get_context.py` | Current developer, git status, active task, active tasks, journal, packages. |
 | workflow context | `.trellis/workflow.md` | Current Trellis flow and next action. |
 | spec context | `.trellis/spec/` + task JSONL | Specs that must be followed during implementation/checking. |
-| task context | `.trellis/tasks/<task>/prd.md`, `info.md`, `research/` | Current task requirements, design, and research. |
+| task context | `.trellis/tasks/<task>/prd.md`, `design.md`, `implement.md`, `research/` | Current task requirements, design, execution plan, and research. |
 | platform context | Platform hooks/settings/agents | Lets different AI tools read the files above through their own mechanisms. |
 
 ## session-start
@@ -34,10 +34,12 @@ If the user wants to change "what the AI should do next in a given state," edit 
 
 Implement and check agents need task context. Trellis has two loading modes:
 
-1. **hook push**: a platform hook injects `prd.md` and the files referenced by `implement.jsonl` / `check.jsonl` before the agent starts.
-2. **agent pull**: the agent definition instructs the agent to read the active task, PRD, and JSONL context after startup.
+1. **hook push**: a platform hook injects a bounded metadata index for the role's JSONL plus bounded `prd.md`, `design.md` if present, and `implement.md` if present before the agent starts. Referenced source bodies are not injected.
+2. **agent pull**: the agent definition instructs the agent to read the active task, treat JSONL as a candidate index, select sources by reason, and read task artifacts after startup.
 
-In both modes, JSONL files in the task directory are the key interface.
+In both modes, JSONL files in the task directory are candidate indexes for spec/research context. Agents load selected sources on demand and prefer targeted search or ranged reads for large files. Task artifacts are read separately in this order: `prd.md` -> `design.md if present` -> `implement.md if present`.
+
+Generated eager integrations cap aggregate task context at 128 KiB, each task artifact at 64 KiB, each rendered manifest index at 32 KiB, manifest source reads at 256 KiB, and rendered entries at 256. Truncation notices name the affected path or manifest and direct the agent to load the remainder on demand.
 
 ## JSONL Reading Rules
 
@@ -47,7 +49,7 @@ In both modes, JSONL files in the task directory are the key interface.
 {"file": ".trellis/spec/backend/index.md", "reason": "Backend rules"}
 ```
 
-Readers should skip seed rows without a `file` field. When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
+Readers should skip seed rows without a `file` or legacy `path` field. File and directory entries render paths, reasons, types, and available metadata without recursively loading bodies. When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
 
 ## Active Task And Context Key
 
@@ -65,4 +67,4 @@ If shell commands cannot see the same context key, `task.py current --source` ma
 | Change JSONL validation/display | `.trellis/scripts/common/task_context.py`. |
 | Change active task resolution | `.trellis/scripts/common/active_task.py`. |
 
-When modifying context injection, verify two things: new sessions can see the correct task, and sub-agents can see the correct PRD/spec/research.
+When modifying context injection, verify two things: new sessions can see the correct task, and sub-agents can see the correct task artifacts/spec/research.

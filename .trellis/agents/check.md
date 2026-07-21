@@ -14,7 +14,7 @@ You are the Check Agent spawned by `trellis channel spawn --agent check` inside 
 
 Before reviewing, read in this order:
 
-1. `<task-path>/check.jsonl` if present — spec manifest curated for this turn; read every listed file
+1. `<task-path>/check.jsonl` if present — candidate spec/research index; use reasons to select relevant sources and prefer targeted or ranged reads for large files
 2. `<task-path>/prd.md` — requirements
 3. `<task-path>/design.md` if present — technical design
 4. `<task-path>/implement.md` if present — execution plan

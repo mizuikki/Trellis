@@ -18,8 +18,10 @@ Context loading determines when AI reads workflow, task, spec, research, workspa
 | --- | --- |
 | `.trellis/workflow.md` | Workflow and next-action hints. |
 | `.trellis/tasks/<task>/prd.md` | Current task requirements. |
-| `.trellis/tasks/<task>/implement.jsonl` | Spec/research to read before implementation. |
-| `.trellis/tasks/<task>/check.jsonl` | Spec/research to read during checking. |
+| `.trellis/tasks/<task>/design.md` | Complex task technical design. |
+| `.trellis/tasks/<task>/implement.md` | Complex task execution plan. |
+| `.trellis/tasks/<task>/implement.jsonl` | Candidate spec/research index for reason-based implementation reads. |
+| `.trellis/tasks/<task>/check.jsonl` | Candidate spec/research index for reason-based checking reads. |
 | `.trellis/spec/` | Project specs. |
 | `.trellis/workspace/` | Session records. |
 | git status | Current working tree changes. |
@@ -64,10 +66,13 @@ First determine which mode the platform uses:
 In both modes, make sure the agent ultimately reads:
 
 1. active task
-2. `prd.md`
-3. `info.md` if present
-4. the corresponding JSONL
-5. spec/research referenced by the JSONL
+2. the corresponding JSONL as a candidate index
+3. relevant spec/research selected by each entry's reason, using targeted or ranged reads for large sources
+4. `prd.md`
+5. `design.md` if present
+6. `implement.md` if present
+
+For eager hook/plugin modes, preserve the default bounds: 128 KiB aggregate task context, 64 KiB per task artifact, 32 KiB per rendered manifest index, 256 KiB per manifest source read, and 256 rendered entries. Referenced source bodies must remain on disk until selected on demand.
 
 ## Troubleshooting Order
 

@@ -3,7 +3,7 @@
   "name": "unbounded-subagent-context-injection",
   "title": "Bound sub-agent context injection",
   "description": "Replace eager JSONL body injection with bounded manifest indexes across generated sub-agent integrations.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "cli",
