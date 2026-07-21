@@ -182,11 +182,11 @@ def _resolve_manifest_entry(
     normalized = raw_path.strip().replace("\\", "/")
     if not normalized or normalized.startswith("/") or re.match(r"^[A-Za-z]:/", normalized):
         return None
-    root = repo_root.resolve()
-    candidate = (root / normalized).resolve()
     try:
+        root = repo_root.resolve()
+        candidate = (root / normalized).resolve()
         display_path = candidate.relative_to(root).as_posix()
-    except ValueError:
+    except (OSError, RuntimeError, ValueError):
         return None
 
     size: int | None = None
@@ -199,7 +199,7 @@ def _resolve_manifest_entry(
             size = metadata.st_size
     except FileNotFoundError:
         status = "missing"
-    except OSError:
+    except (OSError, ValueError):
         status = "unreadable"
 
     return display_path, entry_type, reason, size, revision, status
@@ -298,10 +298,11 @@ def read_jsonl_index(base_path: str, jsonl_path: str) -> str:
             "load the remainder on demand.]"
         )
     rendered = "\n".join(lines)
-    if len(rendered.encode("utf-8")) <= MAX_MANIFEST_INDEX_BYTES:
-        return "\n".join([rendered, *limit_notices])
+    combined = "\n".join([rendered, *limit_notices])
+    if len(combined.encode("utf-8")) <= MAX_MANIFEST_INDEX_BYTES:
+        return combined
     return _truncate_utf8(
-        rendered,
+        combined,
         MAX_MANIFEST_INDEX_BYTES,
         " ".join([f"[Truncated rendered index for {jsonl_path}; load the manifest on demand.]", *limit_notices]),
     )

@@ -615,6 +615,22 @@ describe("opencode TrellisContext single-session fallback", () => {
 
     writeFileSync(
       manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({
+          file: `.trellis/spec/${index}.md`,
+          reason: "r".repeat(43),
+        }),
+      ).join("\n"),
+    );
+    const noticeLimited = ctx.buildManifestIndex(manifestPath);
+    expect(Buffer.byteLength(noticeLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(noticeLimited).toContain(
+      "Omitted additional entries from .trellis/tasks/demo-task/implement.jsonl after 256",
+    );
+    expect(noticeLimited).not.toContain("�");
+
+    writeFileSync(
+      manifestPath,
       Array.from({ length: 256 }, (_, index) =>
         JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
       ).join("\n"),
@@ -635,6 +651,26 @@ describe("opencode TrellisContext single-session fallback", () => {
     expect(sourceLimited).toContain(
       "Stopped reading .trellis/tasks/demo-task/implement.jsonl after 262144 bytes",
     );
+
+    mkdirSync(join(dir, ".trellis", "spec"), { recursive: true });
+    writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({ file: "..", type: "directory", reason: "Parent escape" }),
+        JSON.stringify({ file: "../outside.md", reason: "Outside escape" }),
+        JSON.stringify({
+          file: ".trellis/spec",
+          type: "directory",
+          reason: "Valid directory",
+        }),
+      ].join("\n"),
+    );
+    const boundaryChecked = ctx.buildManifestIndex(manifestPath);
+    expect(boundaryChecked).not.toContain("Parent escape");
+    expect(boundaryChecked).not.toContain("Outside escape");
+    expect(boundaryChecked).toContain("path: .trellis/spec");
+    expect(boundaryChecked).toContain("type: directory");
+    expect(boundaryChecked).toContain("Valid directory");
   });
 });
 

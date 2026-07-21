@@ -167,8 +167,9 @@ function renderManifestIndex(projectRoot: string, taskDir: string, jsonlName: st
    if (entryLimitReached) limitNotices.push(`[Omitted additional entries from ${jsonlName} after ${MAX_MANIFEST_ENTRIES}; load the manifest on demand.]`);
    if (sourceTruncated) limitNotices.push(`[Stopped reading ${jsonlName} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`);
    const rendered = lines.join("\n");
-   if (Buffer.byteLength(rendered, "utf8") <= MAX_MANIFEST_INDEX_BYTES) return [rendered, ...limitNotices].join("\n");
-   return truncateUtf8(rendered, MAX_MANIFEST_INDEX_BYTES, [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "));
+   const combined = [rendered, ...limitNotices].join("\n");
+   if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) return combined;
+   return truncateUtf8(combined, MAX_MANIFEST_INDEX_BYTES, [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "));
 }
 
 // ---------------------------------------------------------------------------

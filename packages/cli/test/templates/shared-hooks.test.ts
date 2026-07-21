@@ -243,6 +243,10 @@ describe("shared-hooks capability table", () => {
         file: "../outside.md",
         reason: "Outside repository",
       }),
+      JSON.stringify({
+        file: "bad\u0000path.md",
+        reason: "Embedded null is malformed",
+      }),
       "{malformed",
       JSON.stringify({ _example: "seed" }),
       JSON.stringify({ file: ".trellis/spec/missing.md", reason: "Missing is non-fatal" }),
@@ -264,6 +268,7 @@ describe("shared-hooks capability table", () => {
     expect(context.match(/path: \.trellis\/spec\/large\.md/g)).toHaveLength(1);
     expect(context).not.toContain("Duplicate Windows-style path");
     expect(context).not.toContain("Outside repository");
+    expect(context).not.toContain("Embedded null is malformed");
   });
 
   it("inject-subagent-context caps UTF-8 artifacts and aggregate context with path-bearing notices", () => {
@@ -313,6 +318,24 @@ describe("shared-hooks capability table", () => {
     expect(entryLimited).toContain(
       "Omitted additional entries from .trellis/tasks/bounded-context/implement.jsonl after 256",
     );
+
+    const nearCapEntries = Array.from({ length: 257 }, (_, index) =>
+      JSON.stringify({
+        file: `.trellis/spec/${index}.md`,
+        reason: "r".repeat(57),
+      }),
+    );
+    const noticeLimited = runSubagentContextProbe(
+      { [taskManifest]: nearCapEntries.join("\n") },
+      "index",
+    );
+    expect(Buffer.byteLength(noticeLimited.trimEnd(), "utf8")).toBeLessThanOrEqual(
+      32 * 1024,
+    );
+    expect(noticeLimited).toContain(
+      "Omitted additional entries from .trellis/tasks/bounded-context/implement.jsonl after 256",
+    );
+    expect(noticeLimited).not.toContain("�");
 
     const longEntries = Array.from({ length: 256 }, (_, index) =>
       JSON.stringify({

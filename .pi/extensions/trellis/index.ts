@@ -454,7 +454,7 @@ function normalizeReason(value: unknown): string {
 }
 function isInsideRoot(root: string, candidate: string): boolean {
   const rel = relative(root, candidate);
-  return rel === "" || (!rel.startsWith("../") && !rel.startsWith("..\\") && !isAbsolute(rel));
+  return rel === "" || (rel !== ".." && !rel.startsWith("../") && !rel.startsWith("..\\") && !isAbsolute(rel));
 }
 function resolveManifestPath(root: string, rawPath: string): { path: string; target: string } | null {
   const normalized = rawPath.trim().replace(/\\/g, "/");
@@ -523,11 +523,12 @@ function renderManifestIndex(root: string, taskDir: string, jsonlName: string): 
     limitNotices.push(`[Stopped reading ${jsonlName} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`);
   }
   const rendered = lines.join("\n");
-  if (Buffer.byteLength(rendered, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
-    return [rendered, ...limitNotices].join("\n");
+  const combined = [rendered, ...limitNotices].join("\n");
+  if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
+    return combined;
   }
   return truncateUtf8(
-    rendered,
+    combined,
     MAX_MANIFEST_INDEX_BYTES,
     [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "),
   );
@@ -1032,10 +1033,11 @@ function buildContext(root: string, agent: string, key: string | null): string {
   const dir = readTaskDir(root, key);
   if (!dir)
     return "No active Trellis task found. Read .trellis/ before proceeding.";
+  const displayTaskDir = relative(resolve(root), resolve(dir)).replace(/\\/g, "/") || ".";
   const jsonlName = TRELLIS_AGENT_JSONL[agent] ?? "";
   const parts = [
     `## Trellis Task Context`,
-    `Task directory: ${dir}`,
+    `Task directory: ${displayTaskDir}`,
   ];
   if (jsonlName) {
     const index = renderManifestIndex(root, dir, jsonlName);
@@ -1043,7 +1045,7 @@ function buildContext(root: string, agent: string, key: string | null): string {
   }
   const truncatedArtifacts: string[] = [];
   for (const [name, label] of [["prd.md", "Requirements"], ["design.md", "Technical Design"], ["implement.md", "Execution Plan"]] as const) {
-    const displayPath = `${dir}/${name}`;
+    const displayPath = `${displayTaskDir}/${name}`;
     try {
       if (statSync(join(dir, name)).size > MAX_TASK_ARTIFACT_BYTES) truncatedArtifacts.push(displayPath);
     } catch {}
@@ -1053,7 +1055,7 @@ function buildContext(root: string, agent: string, key: string | null): string {
   return truncateUtf8(
     parts.join("\n\n"),
     MAX_TASK_CONTEXT_BYTES,
-    `[Task context for ${dir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`,
+    `[Task context for ${displayTaskDir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`,
   );
 }
 

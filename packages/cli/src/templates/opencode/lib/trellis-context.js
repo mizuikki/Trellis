@@ -422,11 +422,12 @@ export class TrellisContext {
       limitNotices.push(`[Stopped reading ${displayPath} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`)
     }
     const rendered = lines.join("\n")
-    if (Buffer.byteLength(rendered, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
-      return [rendered, ...limitNotices].join("\n")
+    const combined = [rendered, ...limitNotices].join("\n")
+    if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
+      return combined
     }
     return this.truncateUtf8(
-      rendered,
+      combined,
       MAX_MANIFEST_INDEX_BYTES,
       [`[Truncated rendered index for ${displayPath}; load the manifest on demand.]`, ...limitNotices].join(" "),
     )

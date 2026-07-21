@@ -141,6 +141,22 @@ describe("omp templates", () => {
 
     fs.writeFileSync(
       manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({
+          file: `.trellis/spec/${index}.md`,
+          reason: "r".repeat(43),
+        }),
+      ).join("\n"),
+    );
+    const noticeLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(Buffer.byteLength(noticeLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(noticeLimited).toContain(
+      "Omitted additional entries from implement.jsonl after 256",
+    );
+    expect(noticeLimited).not.toContain("�");
+
+    fs.writeFileSync(
+      manifestPath,
       Array.from({ length: 256 }, (_, index) =>
         JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
       ).join("\n"),
@@ -157,6 +173,26 @@ describe("omp templates", () => {
     const sourceLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
     expect(sourceLimited).toContain("path: .trellis/spec/first.md");
     expect(sourceLimited).toContain("Stopped reading implement.jsonl after 262144 bytes");
+
+    fs.mkdirSync(path.join(root, ".trellis", "spec"), { recursive: true });
+    fs.writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({ file: "..", type: "directory", reason: "Parent escape" }),
+        JSON.stringify({ file: "../outside.md", reason: "Outside escape" }),
+        JSON.stringify({
+          file: ".trellis/spec",
+          type: "directory",
+          reason: "Valid directory",
+        }),
+      ].join("\n"),
+    );
+    const boundaryChecked = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(boundaryChecked).not.toContain("Parent escape");
+    expect(boundaryChecked).not.toContain("Outside escape");
+    expect(boundaryChecked).toContain("path: .trellis/spec");
+    expect(boundaryChecked).toContain("type: directory");
+    expect(boundaryChecked).toContain("Valid directory");
   });
 
   it("provides the three Trellis sub-agent definitions", () => {
