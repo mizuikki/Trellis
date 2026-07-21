@@ -43,7 +43,7 @@ Main-session workflow platforms such as Kilo, Antigravity, and Devin may not hav
 
 ### hook push
 
-The platform hook injects task context before the agent starts. The agent file itself can focus more on responsibilities and boundaries.
+The platform hook injects bounded task artifacts and a metadata-only manifest index before the agent starts. Referenced source bodies remain available for reason-based, on-demand reads.
 
 Common on platforms that support agent hooks.
 
@@ -53,7 +53,7 @@ The agent file instructs the agent to read after startup:
 
 - `python3 ./.trellis/scripts/task.py current --source`
 - `implement.jsonl` or `check.jsonl`
-- spec/research files referenced by JSONL
+- relevant spec/research sources selected by JSONL reasons, using targeted or ranged reads for large files
 - current task `prd.md`
 - `design.md` if present
 - `implement.md` if present

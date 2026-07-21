@@ -20,7 +20,7 @@ You are already the `trellis-check` sub-agent that the main session dispatched. 
 
 1. Inspect the current git diff.
 2. Read `prd.md`, `design.md` if present, and `implement.md` if present.
-3. Read and follow the spec and research files listed in the task's `check.jsonl`.
+3. Treat `check.jsonl` as a candidate index: use reasons to select relevant spec/research sources and prefer targeted or ranged reads for large files.
 4. Review all changed code against the task artifacts and project specs.
 5. Fix issues directly when they are within scope.
 6. Run the relevant lint, typecheck, and focused tests available for the touched code.

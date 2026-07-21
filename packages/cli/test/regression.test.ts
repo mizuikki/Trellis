@@ -3122,12 +3122,15 @@ print(json.dumps({
     expect(context).toContain("Trellis Native Implement Subagent");
     expect(context).toContain("`trellis-implement` role");
     expect(context).toContain("Active task: .trellis/tasks/issue-106");
-    expect(context).toContain("TOKEN_CODEX_IMPLEMENT");
+    expect(context).not.toContain("TOKEN_CODEX_IMPLEMENT");
+    expect(context).toContain("path: src/implement-context.md");
+    expect(context).toContain("reason: implement contract");
+    expect(context).toContain("type: file");
     expect(context).toContain("TOKEN_CODEX_DESIGN");
     expect(context).toContain("TOKEN_CODEX_PLAN");
   });
 
-  it("[codex-native-subagents] implement and check preserve curated context before task artifacts", () => {
+  it("[codex-native-subagents] implement and check preserve curated indexes before task artifacts", () => {
     setupTaskRepo();
     writeProjectFile(path.join(".git", "HEAD"), "ref: refs/heads/main\n");
     writeProjectFile(
@@ -3169,9 +3172,9 @@ print(json.dumps({
       ),
     );
 
-    for (const [agentType, curatedToken] of [
-      ["trellis-implement", "TOKEN_IMPLEMENT_ORDER"],
-      ["trellis-check", "TOKEN_CHECK_ORDER"],
+    for (const [agentType, curatedPath, curatedToken] of [
+      ["trellis-implement", "path: src/implement-order.md", "TOKEN_IMPLEMENT_ORDER"],
+      ["trellis-check", "path: src/check-order.md", "TOKEN_CHECK_ORDER"],
     ] as const) {
       const output = runPython(
         hookPath,
@@ -3186,8 +3189,9 @@ print(json.dumps({
         hookSpecificOutput: { additionalContext: string };
       };
       const context = parsed.hookSpecificOutput.additionalContext;
+      expect(context).not.toContain(curatedToken);
       const positions = [
-        context.indexOf(curatedToken),
+        context.indexOf(curatedPath),
         context.indexOf("TOKEN_PRD_ORDER"),
         context.indexOf("TOKEN_DESIGN_ORDER"),
         context.indexOf("TOKEN_PLAN_ORDER"),
@@ -3349,11 +3353,14 @@ print(json.dumps({
       TRELLIS_CONTEXT_ID: "codex_parent-b",
     });
 
-    expect(sessionA).toContain("TOKEN_CODEX_SESSION_A");
+    expect(sessionA).toContain("path: src/session-a.md");
+    expect(sessionA).not.toContain("TOKEN_CODEX_SESSION_A");
     expect(sessionA).not.toContain("TOKEN_CODEX_SESSION_B");
-    expect(sessionB).toContain("TOKEN_CODEX_SESSION_B");
+    expect(sessionB).toContain("path: src/session-b.md");
+    expect(sessionB).not.toContain("TOKEN_CODEX_SESSION_B");
     expect(sessionB).not.toContain("TOKEN_CODEX_SESSION_A");
-    expect(parentWins).toContain("TOKEN_CODEX_SESSION_A");
+    expect(parentWins).toContain("path: src/session-a.md");
+    expect(parentWins).not.toContain("TOKEN_CODEX_SESSION_A");
     expect(parentWins).not.toContain("TOKEN_CODEX_SESSION_B");
   });
 
@@ -4417,8 +4424,8 @@ print(json.dumps({
   });
 
   it("[init-context-removal] inject-subagent-context.py skips seed rows (no `file` field)", () => {
-    // Hook's read_jsonl_entries should return empty list when jsonl contains
-    // only a seed row — not crash, not treat `_example` as a path.
+    // Hook's metadata index should be empty when jsonl contains only a seed
+    // row — not crash, not treat `_example` as a path.
     const hookContent = getSharedHookScripts().find(
       (h) => h.name === "inject-subagent-context.py",
     )?.content;
@@ -4436,14 +4443,15 @@ print(json.dumps({
     );
 
     // Run a tiny Python snippet that imports the hook module and calls
-    // read_jsonl_entries. Capturing the stderr warning proves the code path.
+    // read_jsonl_index. Capturing the stderr warning proves the code path.
     const probeScript = `
 import sys, importlib.util
 spec = importlib.util.spec_from_file_location("h", ${JSON.stringify(hookPath)})
 mod = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
-entries = mod.read_jsonl_entries(${JSON.stringify(jsonlDir)}, "seed.jsonl")
-print(len(entries))
+index = mod.read_jsonl_index(${JSON.stringify(jsonlDir)}, "seed.jsonl")
+print(len(index))
 `;
     const probePath = path.join(tmpDir, "probe.py");
     fs.writeFileSync(probePath, probeScript, "utf-8");
@@ -6867,6 +6875,35 @@ describe("regression: class-2 platforms use pull-based sub-agent context", () =>
       });
     });
   }
+
+  it("all pull-based platform outputs use reason-based on-demand selection", () => {
+    for (const platform of [
+      "qoder",
+      "gemini",
+      "copilot",
+      "reasonix",
+      "trae",
+      "grok",
+      "pi",
+    ] as const) {
+      const templates = collectPlatformTemplates(platform);
+      expect(templates, `${platform} templates must be collectable`).toBeInstanceOf(Map);
+      const roleDefinitions = [...(templates ?? new Map<string, string>()).entries()]
+        .filter(
+          ([filePath, content]) =>
+            /trellis-(implement|check)/.test(filePath) &&
+            content.includes("as a candidate index"),
+        )
+        .map(([, content]) => content);
+      expect(roleDefinitions.length, `${platform} must generate implement/check preludes`).toBeGreaterThanOrEqual(2);
+      for (const content of roleDefinitions) {
+        expect(content).toContain("as a candidate index");
+        expect(content).toContain("entry's `reason`");
+        expect(content).toContain("targeted search or ranged reads");
+        expect(content).toContain("do not load every manifest entry wholesale");
+      }
+    }
+  });
 });
 
 // =============================================================================
