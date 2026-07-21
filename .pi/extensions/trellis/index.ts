@@ -434,23 +434,41 @@ function truncateUtf8(text: string, limit: number, notice: string): string {
   if (suffix.length >= limit) return utf8Prefix(suffix, limit);
   return utf8Prefix(bytes, limit - suffix.length) + suffix.toString("utf8");
 }
-function readBoundedArtifact(path: string, displayPath: string): string {
+function readBoundedArtifactDetailed(
+  path: string,
+  displayPath: string,
+): { content: string; truncated: boolean } {
   const bytes = readLimitedBytes(path, MAX_TASK_ARTIFACT_BYTES);
-  if (!bytes) return "";
-  const text = new StringDecoder("utf8").write(bytes);
-  if (bytes.length <= MAX_TASK_ARTIFACT_BYTES) return text;
-  const suffix = Buffer.from(
-    `\n\n[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
-    "utf8",
-  );
-  return utf8Prefix(bytes, MAX_TASK_ARTIFACT_BYTES - suffix.length) + suffix.toString("utf8");
+  if (!bytes) return { content: "", truncated: false };
+  // Flush the decoder so a partial trailing multi-byte sequence becomes U+FFFD
+  // rather than being silently dropped (which would hide raw oversize reads).
+  // Measure rendered UTF-8 so invalid bytes cannot expand past 64 KiB via U+FFFD.
+  const decoder = new StringDecoder("utf8");
+  const text = decoder.write(bytes) + decoder.end();
+  const rawOver = bytes.length > MAX_TASK_ARTIFACT_BYTES;
+  const renderedOver = Buffer.byteLength(text, "utf8") > MAX_TASK_ARTIFACT_BYTES;
+  if (!rawOver && !renderedOver) return { content: text, truncated: false };
+  return {
+    content: truncateUtf8(
+      text,
+      MAX_TASK_ARTIFACT_BYTES,
+      `[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
+    ),
+    truncated: true,
+  };
+}
+function readBoundedArtifact(path: string, displayPath: string): string {
+  return readBoundedArtifactDetailed(path, displayPath).content;
 }
 function normalizeReason(value: unknown): string {
-  const reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  let reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
   if (!reason) return "(no reason provided)";
-  return reason.length <= MAX_REASON_CHARS
-    ? reason
-    : reason.slice(0, MAX_REASON_CHARS - 3) + "...";
+  // Round-trip through UTF-8 replaces unpaired surrogates with U+FFFD.
+  reason = Buffer.from(reason, "utf8").toString("utf8");
+  // Iterate by Unicode code point so a supplementary character is never split.
+  const codePoints = Array.from(reason);
+  if (codePoints.length <= MAX_REASON_CHARS) return reason;
+  return codePoints.slice(0, MAX_REASON_CHARS - 3).join("") + "...";
 }
 function isInsideRoot(root: string, candidate: string): boolean {
   const rel = relative(root, candidate);
@@ -467,7 +485,9 @@ function resolveManifestPath(root: string, rawPath: string): { path: string; tar
     target = resolve(realpathSync(candidate));
   } catch {}
   if (!isInsideRoot(rootPath, target)) return null;
-  return { path: relative(rootPath, candidate).replace(/\\/g, "/"), target };
+  // Display + dedup use the realpath-resolved repository-relative target so
+  // symlink aliases of one file collapse to a single canonical row.
+  return { path: relative(rootPath, target).replace(/\\/g, "/"), target };
 }
 function renderManifestIndex(root: string, taskDir: string, jsonlName: string): string {
   const manifestPath = join(taskDir, jsonlName);
@@ -494,7 +514,8 @@ function renderManifestIndex(root: string, taskDir: string, jsonlName: string): 
       const entryType = row.type === "directory" ? "directory" : "file";
       const resolved = resolveManifestPath(root, rawPath);
       if (!resolved) continue;
-      const key = `${entryType}:${resolved.path}`;
+      // Dedup by canonical path only; first accepted row wins type/reason.
+      const key = resolved.path;
       if (seen.has(key)) continue;
       if (rows.length >= MAX_MANIFEST_ENTRIES) {
         entryLimitReached = true;
@@ -1046,10 +1067,8 @@ function buildContext(root: string, agent: string, key: string | null): string {
   const truncatedArtifacts: string[] = [];
   for (const [name, label] of [["prd.md", "Requirements"], ["design.md", "Technical Design"], ["implement.md", "Execution Plan"]] as const) {
     const displayPath = `${displayTaskDir}/${name}`;
-    try {
-      if (statSync(join(dir, name)).size > MAX_TASK_ARTIFACT_BYTES) truncatedArtifacts.push(displayPath);
-    } catch {}
-    const content = readBoundedArtifact(join(dir, name), displayPath);
+    const { content, truncated } = readBoundedArtifactDetailed(join(dir, name), displayPath);
+    if (truncated) truncatedArtifacts.push(displayPath);
     if (content) parts.push(`### ${displayPath} (${label})\n${content}`);
   }
   return truncateUtf8(

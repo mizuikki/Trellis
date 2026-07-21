@@ -3,7 +3,7 @@
   "name": "bounded-context-unicode-dedup",
   "title": "Harden bounded context Unicode and deduplication",
   "description": "Fix review findings in bounded sub-agent context indexes: Unicode-safe reason handling, post-decode artifact byte ceilings, and canonical-target deduplication across shared Python, Pi, OMP, and OpenCode runtimes.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "cli",

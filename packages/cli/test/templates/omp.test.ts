@@ -195,6 +195,137 @@ describe("omp templates", () => {
     expect(boundaryChecked).toContain("Valid directory");
   });
 
+  it("hardens OMP Unicode reasons, post-decode artifacts, and path-only dedup", () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-unicode-dedup-"));
+    const task = path.join(root, ".trellis", "tasks", "limits");
+    fs.mkdirSync(task, { recursive: true });
+    const internals = loadOmpExtensionInternals();
+    const manifestPath = path.join(task, "implement.jsonl");
+
+    fs.writeFileSync(
+      manifestPath,
+      '{"file":".trellis/spec/surrogate.md","reason":"before\\ud800after"}\n',
+    );
+    const surrogateIndex = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(surrogateIndex).toContain("path: .trellis/spec/surrogate.md");
+    expect(surrogateIndex).toContain("before");
+    expect(surrogateIndex).toContain("after");
+    expect(Buffer.from(surrogateIndex, "utf8").toString("utf8")).toBe(surrogateIndex);
+
+    const emojiReason = `${"x".repeat(236)}😀${"y".repeat(10)}`;
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ file: ".trellis/spec/emoji.md", reason: emojiReason }),
+    );
+    const emojiIndex = internals.renderManifestIndex(root, task, "implement.jsonl");
+    const reasonMatch = emojiIndex.match(/reason: ([^\n]+)/);
+    expect(reasonMatch?.[1]).toBeDefined();
+    const renderedReason = reasonMatch?.[1] ?? "";
+    expect(Array.from(renderedReason).length).toBeLessThanOrEqual(240);
+    expect(renderedReason).toContain("😀");
+    expect(renderedReason.endsWith("...")).toBe(true);
+    expect(Buffer.from(renderedReason, "utf8").toString("utf8")).toBe(renderedReason);
+
+    const artifactPath = path.join(task, "prd.md");
+    const invalidBytes = Buffer.alloc(60_000, 0xff);
+    fs.writeFileSync(artifactPath, invalidBytes);
+    expect(Buffer.byteLength(invalidBytes.toString("utf8"), "utf8")).toBeGreaterThan(64 * 1024);
+    const artifact = internals.readBoundedArtifact(artifactPath, ".trellis/tasks/limits/prd.md");
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain("Truncated .trellis/tasks/limits/prd.md at 65536 UTF-8 bytes");
+    expect(Buffer.from(artifact, "utf8").toString("utf8")).toBe(artifact);
+
+    fs.writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({
+          file: ".trellis/spec/shared.md",
+          type: "file",
+          reason: "first as file",
+        }),
+        JSON.stringify({
+          file: ".trellis/spec/shared.md",
+          type: "directory",
+          reason: "second as directory",
+        }),
+      ].join("\n"),
+    );
+    const deduped = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(deduped.match(/path: \.trellis\/spec\/shared\.md/g)).toHaveLength(1);
+    expect(deduped).toContain("type: file");
+    expect(deduped).toContain("first as file");
+    expect(deduped).not.toContain("second as directory");
+    expect(deduped).not.toContain("type: directory");
+  });
+
+  it("dedupes symlink aliases and reports replacement truncation in aggregate notices", () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-canonical-"));
+    const task = path.join(root, ".trellis", "tasks", "limits");
+    const spec = path.join(root, ".trellis", "spec");
+    fs.mkdirSync(task, { recursive: true });
+    fs.mkdirSync(spec, { recursive: true });
+    fs.writeFileSync(path.join(spec, "real.md"), "canonical body\n");
+    fs.symlinkSync("real.md", path.join(spec, "alias.md"));
+    const internals = loadOmpExtensionInternals();
+    const manifestPath = path.join(task, "implement.jsonl");
+    fs.writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({ file: ".trellis/spec/alias.md", reason: "alias first" }),
+        JSON.stringify({ file: ".trellis/spec/real.md", reason: "real second" }),
+      ].join("\n"),
+    );
+    const index = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(index.match(/path: \.trellis\/spec\/real\.md/g)).toHaveLength(1);
+    expect(index).toContain("alias first");
+    expect(index).not.toContain("real second");
+    expect(index).not.toContain("path: .trellis/spec/alias.md");
+
+    const invalidBytes = Buffer.alloc(60_000, 0xff);
+    fs.writeFileSync(path.join(task, "prd.md"), invalidBytes);
+    fs.writeFileSync(path.join(task, "design.md"), invalidBytes);
+    fs.writeFileSync(path.join(task, "implement.md"), invalidBytes);
+    const context = internals.buildTaskContext(root, task, "trellis-implement");
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    expect(context).toContain("artifact limits applied to");
+    expect(context).not.toContain("artifact limits applied to none");
+    expect(context).toContain(
+      `${path.relative(root, task).replace(/\\/g, "/")}/prd.md`,
+    );
+    expect(context).toContain(
+      `${path.relative(root, task).replace(/\\/g, "/")}/design.md`,
+    );
+    expect(context).toContain(
+      `${path.relative(root, task).replace(/\\/g, "/")}/implement.md`,
+    );
+  });
+
+  it("does not treat untruncated artifacts as limited when their body contains notice text", () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-notice-false-positive-"));
+    const task = path.join(root, ".trellis", "tasks", "limits");
+    fs.mkdirSync(task, { recursive: true });
+    const displayTask = path.relative(root, task).replace(/\\/g, "/");
+    const prdDisplay = `${displayTask}/prd.md`;
+    const embeddedNotice =
+      `[Truncated ${prdDisplay} at 65536 UTF-8 bytes; load the remainder on demand.]`;
+    const prd = `PREFIX\n${embeddedNotice}\n${"a".repeat(40_000)}`;
+    expect(Buffer.byteLength(prd, "utf8")).toBeLessThan(64 * 1024);
+    fs.writeFileSync(path.join(task, "prd.md"), prd);
+    fs.writeFileSync(path.join(task, "design.md"), `START\n${"界".repeat(90_000)}END`);
+    fs.writeFileSync(path.join(task, "implement.md"), `START\n${"划".repeat(90_000)}END`);
+    const context = loadOmpExtensionInternals().buildTaskContext(
+      root,
+      task,
+      "trellis-implement",
+    );
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    const applied = context.match(/artifact limits applied to ([^;]+)/)?.[1] ?? "";
+    expect(applied.length).toBeGreaterThan(0);
+    expect(applied).not.toContain("prd.md");
+    expect(applied).toContain("design.md");
+    expect(applied).toContain("implement.md");
+  });
+
   it("provides the three Trellis sub-agent definitions", () => {
     const agents = getAllAgents();
     expect(agents.map((agent) => agent.name).sort()).toEqual([

@@ -59,13 +59,13 @@ Corresponding tracked dogfood copies must remain synchronized where the reposito
 
 ## Acceptance Criteria
 
-- [ ] Escaped invalid surrogate reasons never crash context assembly on any eager runtime.
-- [ ] Reason truncation never leaves a lone surrogate or broken UTF-8 sequence, including when an emoji crosses the 240-character boundary.
-- [ ] Every artifact reader returns at most 65,536 UTF-8 bytes for both valid and invalid input bytes and retains its truncation notice when content is omitted.
-- [ ] A canonical path declared once as `file` and once as `directory` appears exactly once, with the first accepted row's type and reason.
-- [ ] Aggregate, manifest-index, manifest-source, and entry-count ceilings remain 128 KiB, 32 KiB, 256 KiB, and 256 respectively.
-- [ ] Existing body-exclusion, path-boundary, seed, malformed, missing, directory, cache/session, and prompt-routing tests continue to pass.
-- [ ] Focused tests, CLI lint, TypeScript typecheck, Python typecheck, and the CLI test suite pass.
+- [x] Escaped invalid surrogate reasons never crash context assembly on any eager runtime.
+- [x] Reason truncation never leaves a lone surrogate or broken UTF-8 sequence, including when an emoji crosses the 240-character boundary.
+- [x] Every artifact reader returns at most 65,536 UTF-8 bytes for both valid and invalid input bytes and retains its truncation notice when content is omitted.
+- [x] A canonical path declared once as `file` and once as `directory` appears exactly once, with the first accepted row's type and reason.
+- [x] Aggregate, manifest-index, manifest-source, and entry-count ceilings remain 128 KiB, 32 KiB, 256 KiB, and 256 respectively.
+- [x] Existing body-exclusion, path-boundary, seed, malformed, missing, directory, cache/session, and prompt-routing tests continue to pass.
+- [x] Focused tests, CLI lint, TypeScript typecheck, Python typecheck, and the CLI test suite pass.
 
 ## Out Of Scope
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -20,8 +20,9 @@ const ALL_HOOK_FILES = [
 const EMPTY_EXCEPT_PASS_RE = /except[^\n]*:\n\s*pass\s*$/m;
 
 function runSubagentContextProbe(
-  files: Record<string, string>,
+  files: Record<string, string | Buffer>,
   mode: "context" | "index" | "artifact" = "context",
+  links: Record<string, string> = {},
 ): string {
   const root = mkdtempSync(join(tmpdir(), "trellis-shared-context-"));
   const task = join(root, ".trellis", "tasks", "bounded-context");
@@ -37,6 +38,11 @@ function runSubagentContextProbe(
     const target = join(root, relativePath);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, content);
+  }
+  for (const [linkPath, targetPath] of Object.entries(links)) {
+    const absoluteLink = join(root, linkPath);
+    mkdirSync(dirname(absoluteLink), { recursive: true });
+    symlinkSync(targetPath, absoluteLink);
   }
   const python = process.platform === "win32" ? "python" : "python3";
   return execFileSync(
@@ -370,4 +376,145 @@ describe("shared-hooks capability table", () => {
     );
     expect(sourceLimited).not.toContain("�");
   });
+
+  it("inject-subagent-context hardens Unicode reasons, post-decode artifacts, and path-only dedup",
+    () => {
+      const taskManifest = ".trellis/tasks/bounded-context/implement.jsonl";
+      // Escaped unpaired surrogate must stay non-fatal and render valid UTF-8.
+      const surrogateIndex = runSubagentContextProbe(
+        {
+          [taskManifest]:
+            '{"file":".trellis/spec/surrogate.md","reason":"before\\ud800after"}\n',
+        },
+        "index",
+      );
+      expect(surrogateIndex).toContain("path: .trellis/spec/surrogate.md");
+      expect(surrogateIndex).toContain("before");
+      expect(surrogateIndex).toContain("after");
+      expect(Buffer.from(surrogateIndex, "utf8").toString("utf8")).toBe(surrogateIndex);
+
+      // Emoji at the 240-character boundary must not leave a lone surrogate.
+      const emojiReason = `${"x".repeat(236)}😀${"y".repeat(10)}`;
+      const emojiIndex = runSubagentContextProbe(
+        {
+          [taskManifest]: JSON.stringify({
+            file: ".trellis/spec/emoji.md",
+            reason: emojiReason,
+          }),
+        },
+        "index",
+      );
+      const reasonMatch = emojiIndex.match(/reason: ([^\n]+)/);
+      expect(reasonMatch?.[1]).toBeDefined();
+      const renderedReason = reasonMatch?.[1] ?? "";
+      expect(Array.from(renderedReason).length).toBeLessThanOrEqual(240);
+      expect(renderedReason).toContain("😀");
+      expect(renderedReason.endsWith("...")).toBe(true);
+      expect(Buffer.from(renderedReason, "utf8").toString("utf8")).toBe(renderedReason);
+
+      // Replacement-decoded invalid bytes must still obey the 64 KiB ceiling.
+      const invalidBytes = Buffer.alloc(60_000, 0xff);
+      expect(Buffer.byteLength(invalidBytes.toString("utf8"), "utf8")).toBeGreaterThan(
+        64 * 1024,
+      );
+      const artifact = runSubagentContextProbe(
+        { ".trellis/tasks/bounded-context/prd.md": invalidBytes },
+        "artifact",
+      );
+      expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+      expect(artifact).toContain(
+        "Truncated .trellis/tasks/bounded-context/prd.md at 65536 UTF-8 bytes",
+      );
+      expect(Buffer.from(artifact, "utf8").toString("utf8")).toBe(artifact);
+
+      // Cross-type duplicate rows for one canonical path: first accepted row wins.
+      const deduped = runSubagentContextProbe(
+        {
+          [taskManifest]: [
+            JSON.stringify({
+              file: ".trellis/spec/shared.md",
+              type: "file",
+              reason: "first as file",
+            }),
+            JSON.stringify({
+              file: ".trellis/spec/shared.md",
+              type: "directory",
+              reason: "second as directory",
+            }),
+          ].join("\n"),
+        },
+        "index",
+      );
+      expect(deduped.match(/path: \.trellis\/spec\/shared\.md/g)).toHaveLength(1);
+      expect(deduped).toContain("type: file");
+      expect(deduped).toContain("first as file");
+      expect(deduped).not.toContain("second as directory");
+      expect(deduped).not.toContain("type: directory");
+    },
+  );
+
+  it("dedupes symlink aliases to one canonical target and reports replacement truncation in aggregate notices",
+    () => {
+      const taskManifest = ".trellis/tasks/bounded-context/implement.jsonl";
+      const index = runSubagentContextProbe(
+        {
+          ".trellis/spec/real.md": "canonical body\n",
+          [taskManifest]: [
+            JSON.stringify({
+              file: ".trellis/spec/alias.md",
+              reason: "alias first",
+            }),
+            JSON.stringify({
+              file: ".trellis/spec/real.md",
+              reason: "real second",
+            }),
+          ].join("\n"),
+        },
+        "index",
+        { ".trellis/spec/alias.md": "real.md" },
+      );
+      expect(index.match(/path: \.trellis\/spec\/real\.md/g)).toHaveLength(1);
+      expect(index).toContain("alias first");
+      expect(index).not.toContain("real second");
+      expect(index).not.toContain("path: .trellis/spec/alias.md");
+
+      const invalidBytes = Buffer.alloc(60_000, 0xff);
+      const context = runSubagentContextProbe({
+        ".trellis/tasks/bounded-context/implement.jsonl": "",
+        ".trellis/tasks/bounded-context/prd.md": invalidBytes,
+        ".trellis/tasks/bounded-context/design.md": invalidBytes,
+        ".trellis/tasks/bounded-context/implement.md": invalidBytes,
+      });
+      expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+      expect(context).toContain("artifact limits applied to");
+      expect(context).not.toContain("artifact limits applied to none");
+      expect(context).toContain(".trellis/tasks/bounded-context/prd.md");
+      expect(context).toContain(".trellis/tasks/bounded-context/design.md");
+      expect(context).toContain(".trellis/tasks/bounded-context/implement.md");
+    },
+  );
+
+  it("does not treat untruncated artifacts as limited when their body contains notice text",
+    () => {
+      const prdPath = ".trellis/tasks/bounded-context/prd.md";
+      const embeddedNotice =
+        `[Truncated ${prdPath} at 65536 UTF-8 bytes; load the remainder on demand.]`;
+      const prd = `PREFIX\n${embeddedNotice}\n${"a".repeat(40_000)}`;
+      expect(Buffer.byteLength(prd, "utf8")).toBeLessThan(64 * 1024);
+      const large = `START\n${"界".repeat(90_000)}END`;
+      const context = runSubagentContextProbe({
+        ".trellis/tasks/bounded-context/implement.jsonl": "",
+        [prdPath]: prd,
+        ".trellis/tasks/bounded-context/design.md": large,
+        ".trellis/tasks/bounded-context/implement.md": large,
+      });
+      expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+      const applied =
+        context.match(/artifact limits applied to ([^;]+)/)?.[1] ?? "";
+      expect(applied.length).toBeGreaterThan(0);
+      expect(applied).not.toContain("prd.md");
+      expect(applied).toContain("design.md");
+      expect(applied).toContain("implement.md");
+    },
+  );
 });

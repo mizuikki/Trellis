@@ -150,27 +150,50 @@ def _truncate_utf8(text: str, limit: int, notice: str) -> str:
     return prefix + suffix.decode("utf-8")
 
 
-def _read_bounded_artifact(repo_root: str, relative_path: str) -> str | None:
+def _unicode_safe(text: str) -> str:
+    """Replace unpaired surrogates so later UTF-8 encoding never raises."""
+    return "".join(
+        "\ufffd" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text
+    )
+
+
+def _read_bounded_artifact_detailed(
+    repo_root: str, relative_path: str
+) -> tuple[str | None, bool]:
+    """Return (content, truncated). truncated is structural, never inferred from text."""
     full_path = Path(repo_root) / relative_path
     try:
         with full_path.open("rb") as stream:
             raw = stream.read(MAX_TASK_ARTIFACT_BYTES + 1)
     except OSError:
-        return None
+        return None, False
     text = raw.decode("utf-8", errors="replace")
-    if len(raw) <= MAX_TASK_ARTIFACT_BYTES:
-        return text
+    # Enforce the ceiling on rendered UTF-8 bytes, not just raw disk bytes.
+    # Invalid sequences expand under replacement decoding (U+FFFD is 3 bytes).
+    # Also truncate when the raw read overshot — more content remains on disk.
+    raw_over = len(raw) > MAX_TASK_ARTIFACT_BYTES
+    rendered_over = len(text.encode("utf-8")) > MAX_TASK_ARTIFACT_BYTES
+    if not raw_over and not rendered_over:
+        return text, False
     notice = (
         f"[Truncated {relative_path} at {MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; "
         "load the remainder on demand.]"
     )
-    return _truncate_utf8(text, MAX_TASK_ARTIFACT_BYTES, notice)
+    return _truncate_utf8(text, MAX_TASK_ARTIFACT_BYTES, notice), True
+
+
+def _read_bounded_artifact(repo_root: str, relative_path: str) -> str | None:
+    content, _truncated = _read_bounded_artifact_detailed(repo_root, relative_path)
+    return content
 
 
 def _normalize_reason(value: object) -> str:
-    reason = " ".join(value.split()) if isinstance(value, str) else ""
+    if not isinstance(value, str):
+        return "(no reason provided)"
+    reason = " ".join(_unicode_safe(value).split())
     if not reason:
         return "(no reason provided)"
+    # len()/slice operate on Unicode scalar values in Python 3.
     if len(reason) <= MAX_REASON_CHARS:
         return reason
     return reason[: MAX_REASON_CHARS - 3] + "..."
@@ -242,7 +265,7 @@ def read_jsonl_index(base_path: str, jsonl_path: str) -> str:
         source = source[:last_newline] if last_newline >= 0 else ""
 
     entries: list[tuple[str, str, str, int | None, int | None, str | None]] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
     entry_limit_reached = False
     saw_real_entry = False
     for line in source.splitlines():
@@ -265,7 +288,8 @@ def read_jsonl_index(base_path: str, jsonl_path: str) -> str:
         )
         if entry is None:
             continue
-        key = (entry[0], entry[1])
+        # Dedup by canonical path only; first accepted row wins type/reason.
+        key = entry[0]
         if key in seen:
             continue
         if len(entries) >= MAX_MANIFEST_ENTRIES:
@@ -327,12 +351,9 @@ def _build_task_context(repo_root: str, task_dir: str, agent_type: str) -> str:
     truncated_artifacts: list[str] = []
     for name, label in artifacts:
         relative_path = f"{task_dir}/{name}"
-        try:
-            if (Path(repo_root) / relative_path).stat().st_size > MAX_TASK_ARTIFACT_BYTES:
-                truncated_artifacts.append(relative_path)
-        except OSError:
-            pass
-        content = _read_bounded_artifact(repo_root, relative_path)
+        content, truncated = _read_bounded_artifact_detailed(repo_root, relative_path)
+        if truncated:
+            truncated_artifacts.append(relative_path)
         if content:
             parts.append(f"=== {relative_path} ({label}) ===\n{content}")
 

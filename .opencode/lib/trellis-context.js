@@ -322,17 +322,29 @@ export class TrellisContext {
     return this.utf8Prefix(bytes, limit - suffix.length) + suffix.toString("utf8")
   }
 
-  readBoundedArtifact(filePath, displayPath) {
+  readBoundedArtifactDetailed(filePath, displayPath) {
     const bytes = this.readLimitedBytes(filePath, MAX_TASK_ARTIFACT_BYTES)
-    if (!bytes) return ""
-    if (bytes.length <= MAX_TASK_ARTIFACT_BYTES) {
-      return new StringDecoder("utf8").write(bytes)
+    if (!bytes) return { content: "", truncated: false }
+    // Flush the decoder so a partial trailing multi-byte sequence becomes U+FFFD
+    // rather than being silently dropped (which would hide raw oversize reads).
+    // Measure rendered UTF-8 so invalid bytes cannot expand past 64 KiB via U+FFFD.
+    const decoder = new StringDecoder("utf8")
+    const text = decoder.write(bytes) + decoder.end()
+    const rawOver = bytes.length > MAX_TASK_ARTIFACT_BYTES
+    const renderedOver = Buffer.byteLength(text, "utf8") > MAX_TASK_ARTIFACT_BYTES
+    if (!rawOver && !renderedOver) return { content: text, truncated: false }
+    return {
+      content: this.truncateUtf8(
+        text,
+        MAX_TASK_ARTIFACT_BYTES,
+        `[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
+      ),
+      truncated: true,
     }
-    const suffix = Buffer.from(
-      `\n\n[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
-      "utf8",
-    )
-    return this.utf8Prefix(bytes, MAX_TASK_ARTIFACT_BYTES - suffix.length) + suffix.toString("utf8")
+  }
+
+  readBoundedArtifact(filePath, displayPath) {
+    return this.readBoundedArtifactDetailed(filePath, displayPath).content
   }
 
   resolveManifestPath(rawPath) {
@@ -351,18 +363,23 @@ export class TrellisContext {
       }
       const targetRel = relative(root, target)
       if (targetRel === ".." || targetRel.startsWith("../") || targetRel.startsWith("..\\") || isAbsolute(targetRel)) return null
-      return { path: rel.replace(/\\/g, "/"), target }
+      // Display + dedup use the realpath-resolved repository-relative target so
+      // symlink aliases of one file collapse to a single canonical row.
+      return { path: targetRel.replace(/\\/g, "/"), target }
     } catch {
       return null
     }
   }
 
   normalizeReason(value) {
-    const reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : ""
+    let reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : ""
     if (!reason) return "(no reason provided)"
-    return reason.length <= MAX_REASON_CHARS
-      ? reason
-      : reason.slice(0, MAX_REASON_CHARS - 3) + "..."
+    // Round-trip through UTF-8 replaces unpaired surrogates with U+FFFD.
+    reason = Buffer.from(reason, "utf8").toString("utf8")
+    // Iterate by Unicode code point so a supplementary character is never split.
+    const codePoints = Array.from(reason)
+    if (codePoints.length <= MAX_REASON_CHARS) return reason
+    return codePoints.slice(0, MAX_REASON_CHARS - 3).join("") + "..."
   }
 
   buildManifestIndex(jsonlPath) {
@@ -390,7 +407,8 @@ export class TrellisContext {
         const entryType = entry.type === "directory" ? "directory" : "file"
         const resolved = this.resolveManifestPath(rawPath)
         if (!resolved) continue
-        const key = `${entryType}:${resolved.path}`
+        // Dedup by canonical path only; first accepted row wins type/reason.
+        const key = resolved.path
         if (seen.has(key)) continue
         if (rows.length >= MAX_MANIFEST_ENTRIES) {
           entryLimitReached = true
@@ -447,12 +465,8 @@ export class TrellisContext {
       ["implement.md", "Execution Plan"],
     ]) {
       const displayPath = `${displayTaskDir}/${name}`
-      try {
-        if (statSync(join(taskDir, name)).size > MAX_TASK_ARTIFACT_BYTES) truncatedArtifacts.push(displayPath)
-      } catch {
-        // Missing task artifacts remain optional.
-      }
-      const content = this.readBoundedArtifact(join(taskDir, name), displayPath)
+      const { content, truncated } = this.readBoundedArtifactDetailed(join(taskDir, name), displayPath)
+      if (truncated) truncatedArtifacts.push(displayPath)
       if (content) parts.push(`=== ${displayPath} (${label}) ===\n${content}`)
     }
     return this.truncateUtf8(
