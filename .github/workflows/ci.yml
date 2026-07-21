@@ -50,9 +50,6 @@ jobs:
       - name: Lint (core + cli)
         run: pnpm lint
 
-      - name: Test (core + cli)
-        run: pnpm test
-
       - name: Build (core then cli)
         run: pnpm build
 
@@ -66,3 +63,6 @@ jobs:
           test -d packages/cli/dist
           test -f packages/cli/dist/index.js
           echo "Build verification passed"
+
+      - name: Test (core + cli)
+        run: pnpm test
