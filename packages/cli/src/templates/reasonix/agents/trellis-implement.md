@@ -19,7 +19,7 @@ You are already the `trellis-implement` sub-agent that the main session dispatch
 ## Core Responsibilities
 
 1. Understand the active task requirements.
-2. Read and follow the spec and research files listed in the task's `implement.jsonl`.
+2. Treat `implement.jsonl` as a candidate index. Use each entry's `reason` to select relevant spec/research sources, read selected sources on demand, and prefer targeted search or ranged reads for large files; do not load every manifest entry wholesale.
 3. Implement the requested change using existing project patterns.
 4. Run the relevant lint, typecheck, and focused tests available for the touched code.
 5. Report files changed and verification results.

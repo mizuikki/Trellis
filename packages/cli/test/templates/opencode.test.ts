@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -584,6 +584,213 @@ describe("opencode TrellisContext single-session fallback", () => {
     // exact match is attempted first.
     expect(active.taskPath).toBeNull();
   });
+
+  it("enforces OpenCode artifact, entry, source, and rendered-index limits", () => {
+    const task = join(dir, ".trellis", "tasks", "demo-task");
+    const ctx = new TrellisContext(dir);
+    const artifactPath = join(task, "prd.md");
+    writeFileSync(artifactPath, `START\n${"界".repeat(90_000)}END`);
+    const artifact = ctx.readBoundedArtifact(
+      artifactPath,
+      ".trellis/tasks/demo-task/prd.md",
+    );
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain(
+      "Truncated .trellis/tasks/demo-task/prd.md at 65536 UTF-8 bytes",
+    );
+    expect(artifact).not.toContain("�");
+
+    const manifestPath = join(task, "implement.jsonl");
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/${index}.md`, reason: `entry ${index}` }),
+      ).join("\n"),
+    );
+    const entryLimited = ctx.buildManifestIndex(manifestPath);
+    expect(entryLimited.match(/^- path:/gm)).toHaveLength(256);
+    expect(entryLimited).toContain(
+      "Omitted additional entries from .trellis/tasks/demo-task/implement.jsonl after 256",
+    );
+
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({
+          file: `.trellis/spec/${index}.md`,
+          reason: "r".repeat(43),
+        }),
+      ).join("\n"),
+    );
+    const noticeLimited = ctx.buildManifestIndex(manifestPath);
+    expect(Buffer.byteLength(noticeLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(noticeLimited).toContain(
+      "Omitted additional entries from .trellis/tasks/demo-task/implement.jsonl after 256",
+    );
+    expect(noticeLimited).not.toContain("�");
+
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 256 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
+      ).join("\n"),
+    );
+    const indexLimited = ctx.buildManifestIndex(manifestPath);
+    expect(Buffer.byteLength(indexLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(indexLimited).toContain(
+      "Truncated rendered index for .trellis/tasks/demo-task/implement.jsonl",
+    );
+    expect(indexLimited).not.toContain("�");
+
+    writeFileSync(
+      manifestPath,
+      `${JSON.stringify({ file: ".trellis/spec/first.md", reason: "first" })}\n${"x".repeat(300 * 1024)}`,
+    );
+    const sourceLimited = ctx.buildManifestIndex(manifestPath);
+    expect(sourceLimited).toContain("path: .trellis/spec/first.md");
+    expect(sourceLimited).toContain(
+      "Stopped reading .trellis/tasks/demo-task/implement.jsonl after 262144 bytes",
+    );
+
+    mkdirSync(join(dir, ".trellis", "spec"), { recursive: true });
+    writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({ file: "..", type: "directory", reason: "Parent escape" }),
+        JSON.stringify({ file: "../outside.md", reason: "Outside escape" }),
+        JSON.stringify({
+          file: ".trellis/spec",
+          type: "directory",
+          reason: "Valid directory",
+        }),
+      ].join("\n"),
+    );
+    const boundaryChecked = ctx.buildManifestIndex(manifestPath);
+    expect(boundaryChecked).not.toContain("Parent escape");
+    expect(boundaryChecked).not.toContain("Outside escape");
+    expect(boundaryChecked).toContain("path: .trellis/spec");
+    expect(boundaryChecked).toContain("type: directory");
+    expect(boundaryChecked).toContain("Valid directory");
+  });
+
+  it("hardens OpenCode Unicode reasons, post-decode artifacts, and path-only dedup", () => {
+    const task = join(dir, ".trellis", "tasks", "demo-task");
+    const ctx = new TrellisContext(dir);
+    const manifestPath = join(task, "implement.jsonl");
+
+    writeFileSync(
+      manifestPath,
+      '{"file":".trellis/spec/surrogate.md","reason":"before\\ud800after"}\n',
+    );
+    const surrogateIndex = ctx.buildManifestIndex(manifestPath);
+    expect(surrogateIndex).toContain("path: .trellis/spec/surrogate.md");
+    expect(surrogateIndex).toContain("before");
+    expect(surrogateIndex).toContain("after");
+    expect(Buffer.from(surrogateIndex, "utf8").toString("utf8")).toBe(surrogateIndex);
+
+    const emojiReason = `${"x".repeat(236)}😀${"y".repeat(10)}`;
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({ file: ".trellis/spec/emoji.md", reason: emojiReason }),
+    );
+    const emojiIndex = ctx.buildManifestIndex(manifestPath);
+    const reasonMatch = emojiIndex.match(/reason: ([^\n]+)/);
+    expect(reasonMatch?.[1]).toBeDefined();
+    const renderedReason = reasonMatch?.[1] ?? "";
+    expect(Array.from(renderedReason).length).toBeLessThanOrEqual(240);
+    expect(renderedReason).toContain("😀");
+    expect(renderedReason.endsWith("...")).toBe(true);
+    expect(Buffer.from(renderedReason, "utf8").toString("utf8")).toBe(renderedReason);
+
+    const artifactPath = join(task, "prd.md");
+    const invalidBytes = Buffer.alloc(60_000, 0xff);
+    writeFileSync(artifactPath, invalidBytes);
+    expect(Buffer.byteLength(invalidBytes.toString("utf8"), "utf8")).toBeGreaterThan(64 * 1024);
+    const artifact = ctx.readBoundedArtifact(
+      artifactPath,
+      ".trellis/tasks/demo-task/prd.md",
+    );
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain(
+      "Truncated .trellis/tasks/demo-task/prd.md at 65536 UTF-8 bytes",
+    );
+    expect(Buffer.from(artifact, "utf8").toString("utf8")).toBe(artifact);
+
+    writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({
+          file: ".trellis/spec/shared.md",
+          type: "file",
+          reason: "first as file",
+        }),
+        JSON.stringify({
+          file: ".trellis/spec/shared.md",
+          type: "directory",
+          reason: "second as directory",
+        }),
+      ].join("\n"),
+    );
+    const deduped = ctx.buildManifestIndex(manifestPath);
+    expect(deduped.match(/path: \.trellis\/spec\/shared\.md/g)).toHaveLength(1);
+    expect(deduped).toContain("type: file");
+    expect(deduped).toContain("first as file");
+    expect(deduped).not.toContain("second as directory");
+    expect(deduped).not.toContain("type: directory");
+  });
+
+  it("dedupes symlink aliases and reports replacement truncation in aggregate notices", () => {
+    const task = join(dir, ".trellis", "tasks", "demo-task");
+    const spec = join(dir, ".trellis", "spec");
+    mkdirSync(spec, { recursive: true });
+    writeFileSync(join(spec, "real.md"), "canonical body\n");
+    symlinkSync("real.md", join(spec, "alias.md"));
+    const ctx = new TrellisContext(dir);
+    const manifestPath = join(task, "implement.jsonl");
+    writeFileSync(
+      manifestPath,
+      [
+        JSON.stringify({ file: ".trellis/spec/alias.md", reason: "alias first" }),
+        JSON.stringify({ file: ".trellis/spec/real.md", reason: "real second" }),
+      ].join("\n"),
+    );
+    const index = ctx.buildManifestIndex(manifestPath);
+    expect(index.match(/path: \.trellis\/spec\/real\.md/g)).toHaveLength(1);
+    expect(index).toContain("alias first");
+    expect(index).not.toContain("real second");
+    expect(index).not.toContain("path: .trellis/spec/alias.md");
+
+    const invalidBytes = Buffer.alloc(60_000, 0xff);
+    writeFileSync(join(task, "prd.md"), invalidBytes);
+    writeFileSync(join(task, "design.md"), invalidBytes);
+    writeFileSync(join(task, "implement.md"), invalidBytes);
+    const context = ctx.buildTaskContext(task, ["implement.jsonl"]);
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    expect(context).toContain("artifact limits applied to");
+    expect(context).not.toContain("artifact limits applied to none");
+    expect(context).toContain(".trellis/tasks/demo-task/prd.md");
+    expect(context).toContain(".trellis/tasks/demo-task/design.md");
+    expect(context).toContain(".trellis/tasks/demo-task/implement.md");
+  });
+
+  it("does not treat untruncated artifacts as limited when their body contains notice text", () => {
+    const task = join(dir, ".trellis", "tasks", "demo-task");
+    const prdDisplay = ".trellis/tasks/demo-task/prd.md";
+    const embeddedNotice =
+      `[Truncated ${prdDisplay} at 65536 UTF-8 bytes; load the remainder on demand.]`;
+    const prd = `PREFIX\n${embeddedNotice}\n${"a".repeat(40_000)}`;
+    expect(Buffer.byteLength(prd, "utf8")).toBeLessThan(64 * 1024);
+    writeFileSync(join(task, "prd.md"), prd);
+    writeFileSync(join(task, "design.md"), `START\n${"界".repeat(90_000)}END`);
+    writeFileSync(join(task, "implement.md"), `START\n${"划".repeat(90_000)}END`);
+    const context = new TrellisContext(dir).buildTaskContext(task, ["implement.jsonl"]);
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    const applied = context.match(/artifact limits applied to ([^;]+)/)?.[1] ?? "";
+    expect(applied.length).toBeGreaterThan(0);
+    expect(applied).not.toContain("prd.md");
+    expect(applied).toContain("design.md");
+    expect(applied).toContain("implement.md");
+  });
 });
 
 describe("opencode inject-subagent-context (issue #264)", () => {
@@ -628,16 +835,31 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     );
   });
 
-  it("inlines JSONL-referenced spec content into the implement prompt", async () => {
-    // Cover AC #1: "JSONL-referenced context" — the seed-only jsonl path
-    // is exercised above; this one verifies a curated entry is inlined.
+  it("indexes JSONL references without inlining bodies and bounds task context", async () => {
     const specPath = join(dir, ".trellis", "spec", "demo.md");
     mkdirSync(join(dir, ".trellis", "spec"), { recursive: true });
-    writeFileSync(specPath, "# Demo Spec\n\nUNIQUE_SPEC_MARKER_42");
+    const marker = "UNIQUE_SPEC_MARKER_42";
+    writeFileSync(specPath, `${marker}\n${"x".repeat(2 * 1024 * 1024)}`);
     writeFileSync(
       join(dir, ".trellis", "tasks", "demo-task", "implement.jsonl"),
-      JSON.stringify({ file: ".trellis/spec/demo.md", reason: "test" }) + "\n",
+      [
+        JSON.stringify({
+          file: ".trellis/spec/demo.md",
+          reason: "OpenCode metadata reason",
+        }),
+        JSON.stringify({
+          path: ".trellis/spec",
+          type: "directory",
+          reason: "OpenCode directory",
+        }),
+        "{bad",
+        JSON.stringify({ _example: "seed" }),
+      ].join("\n"),
     );
+    const taskDir = join(dir, ".trellis", "tasks", "demo-task");
+    writeFileSync(join(taskDir, "prd.md"), `PRD_START\n${"界".repeat(90_000)}PRD_END`);
+    writeFileSync(join(taskDir, "design.md"), `DESIGN_START\n${"计".repeat(90_000)}`);
+    writeFileSync(join(taskDir, "implement.md"), `PLAN_START\n${"划".repeat(90_000)}`);
     writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
 
     const output: TaskToolOutput = {
@@ -653,9 +875,17 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     );
 
     expect(output.args.prompt).toContain("<!-- trellis-hook-injected -->");
-    expect(output.args.prompt).toContain("=== .trellis/spec/demo.md ===");
-    expect(output.args.prompt).toContain("UNIQUE_SPEC_MARKER_42");
-    expect(output.args.prompt).toContain("Demo PRD");
+    expect(Buffer.byteLength(output.args.prompt ?? "", "utf8")).toBeLessThan(
+      140 * 1024,
+    );
+    expect(output.args.prompt).not.toContain(marker);
+    expect(output.args.prompt).toContain(".trellis/spec/demo.md");
+    expect(output.args.prompt).toContain("OpenCode metadata reason");
+    expect(output.args.prompt).toContain("type: file");
+    expect(output.args.prompt).toContain("type: directory");
+    expect(output.args.prompt).not.toContain("PRD_END");
+    expect(output.args.prompt).not.toContain("�");
+    expect(output.args.prompt).toContain("load the remainder on demand");
   });
 
   it("mutates check prompt using Active task hint when runtime resolution fails", async () => {
