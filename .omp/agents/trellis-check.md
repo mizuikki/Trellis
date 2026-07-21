@@ -23,7 +23,7 @@ Do the review and fixes directly.
 ## Core Responsibilities
 
 1. Inspect the current git diff.
-2. Read and follow the spec and research files listed in the task's `check.jsonl`.
+2. Treat `check.jsonl` as a candidate index: use reasons to select relevant spec/research sources and prefer targeted or ranged reads for large files.
 3. Review all changed code against the task PRD and project specs.
 4. Fix issues directly when they are within scope.
 5. Run the relevant lint, typecheck, and focused tests for the touched code.

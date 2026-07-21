@@ -14,7 +14,7 @@ You are the Implement Agent spawned by `trellis channel spawn --agent implement`
 
 Before implementing, read in this order:
 
-1. `<task-path>/implement.jsonl` if present — spec manifest curated for this turn; read every listed file
+1. `<task-path>/implement.jsonl` if present — candidate spec/research index; use reasons to select relevant sources and prefer targeted or ranged reads for large files
 2. `<task-path>/prd.md` — requirements
 3. `<task-path>/design.md` if present — technical design
 4. `<task-path>/implement.md` if present — execution plan
@@ -37,7 +37,7 @@ The supervising main session owns commits. Report what changed; do not commit on
 
 ## Workflow
 
-1. Read relevant specs based on task type and the files in `implement.jsonl` if present
+1. Use `implement.jsonl` reasons and the task type to select relevant specs; do not read every entry wholesale
 2. Read the task's `prd.md`, `design.md` if present, and `implement.md` if present
 3. Implement features following specs and existing patterns
 4. Run the project's lint and typecheck commands on the changed scope

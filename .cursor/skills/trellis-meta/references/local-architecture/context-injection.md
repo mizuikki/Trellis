@@ -34,10 +34,12 @@ If the user wants to change "what the AI should do next in a given state," edit 
 
 Implement and check agents need task context. Trellis has two loading modes:
 
-1. **hook push**: a platform hook injects jsonl-referenced files plus `prd.md`, `design.md` if present, and `implement.md` if present before the agent starts.
-2. **agent pull**: the agent definition instructs the agent to read the active task, jsonl context, and task artifacts after startup.
+1. **hook push**: a platform hook injects a bounded metadata index for the role's JSONL plus bounded `prd.md`, `design.md` if present, and `implement.md` if present before the agent starts. Referenced source bodies are not injected.
+2. **agent pull**: the agent definition instructs the agent to read the active task, treat JSONL as a candidate index, select sources by reason, and read task artifacts after startup.
 
-In both modes, JSONL files in the task directory are the manifest for spec/research context. Task artifacts are read separately in this order: `prd.md` -> `design.md if present` -> `implement.md if present`.
+In both modes, JSONL files in the task directory are candidate indexes for spec/research context. Agents load selected sources on demand and prefer targeted search or ranged reads for large files. Task artifacts are read separately in this order: `prd.md` -> `design.md if present` -> `implement.md if present`.
+
+Generated eager integrations cap aggregate task context at 128 KiB, each task artifact at 64 KiB, each rendered manifest index at 32 KiB, manifest source reads at 256 KiB, and rendered entries at 256. Truncation notices name the affected path or manifest and direct the agent to load the remainder on demand.
 
 ## JSONL Reading Rules
 
@@ -47,7 +49,7 @@ In both modes, JSONL files in the task directory are the manifest for spec/resea
 {"file": ".trellis/spec/backend/index.md", "reason": "Backend rules"}
 ```
 
-Readers should skip seed rows without a `file` field. When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
+Readers should skip seed rows without a `file` or legacy `path` field. File and directory entries render paths, reasons, types, and available metadata without recursively loading bodies. When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
 
 ## Active Task And Context Key
 

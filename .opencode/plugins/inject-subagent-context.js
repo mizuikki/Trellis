@@ -31,64 +31,18 @@ function extractActiveTaskHint(prompt) {
  * `ctx.resolveTaskDir`.
  */
 function getImplementContext(ctx, taskDir) {
-  const parts = []
   const taskDirFull = ctx.resolveTaskDir(taskDir)
   if (!taskDirFull) return ""
-
-  const jsonlPath = join(taskDirFull, "implement.jsonl")
-  const entries = ctx.readJsonlWithFiles(jsonlPath)
-  if (entries.length > 0) {
-    parts.push(ctx.buildContextFromEntries(entries))
-  }
-
-  const prd = ctx.readFile(join(taskDirFull, "prd.md"))
-  if (prd) {
-    parts.push(`=== ${taskDir}/prd.md (Requirements) ===\n${prd}`)
-  }
-
-  const design = ctx.readFile(join(taskDirFull, "design.md"))
-  if (design) {
-    parts.push(`=== ${taskDir}/design.md (Technical Design) ===\n${design}`)
-  }
-
-  const implementPlan = ctx.readFile(join(taskDirFull, "implement.md"))
-  if (implementPlan) {
-    parts.push(`=== ${taskDir}/implement.md (Execution Plan) ===\n${implementPlan}`)
-  }
-
-  return parts.join("\n\n")
+  return ctx.buildTaskContext(taskDirFull, ["implement.jsonl"])
 }
 
 /**
  * Get context for check agent. `taskDir` may be relative or absolute.
  */
 function getCheckContext(ctx, taskDir) {
-  const parts = []
   const taskDirFull = ctx.resolveTaskDir(taskDir)
   if (!taskDirFull) return ""
-
-  const jsonlPath = join(taskDirFull, "check.jsonl")
-  const entries = ctx.readJsonlWithFiles(jsonlPath)
-  if (entries.length > 0) {
-    parts.push(ctx.buildContextFromEntries(entries))
-  }
-
-  const prd = ctx.readFile(join(taskDirFull, "prd.md"))
-  if (prd) {
-    parts.push(`=== ${taskDir}/prd.md (Requirements) ===\n${prd}`)
-  }
-
-  const design = ctx.readFile(join(taskDirFull, "design.md"))
-  if (design) {
-    parts.push(`=== ${taskDir}/design.md (Technical Design) ===\n${design}`)
-  }
-
-  const implementPlan = ctx.readFile(join(taskDirFull, "implement.md"))
-  if (implementPlan) {
-    parts.push(`=== ${taskDir}/implement.md (Execution Plan) ===\n${implementPlan}`)
-  }
-
-  return parts.join("\n\n")
+  return ctx.buildTaskContext(taskDirFull, ["check.jsonl"])
 }
 
 /**
@@ -179,7 +133,7 @@ ${originalPrompt}
 
 ## Workflow
 
-1. **Understand specs** - All dev specs are injected above
+1. **Select specs** - Use manifest reasons to select relevant sources on demand; prefer targeted or ranged reads for large files
 2. **Understand task artifacts** - Read requirements, technical design if present, and execution plan if present
 3. **Implement feature** - Follow specs and task artifacts
 4. **Self-check** - Ensure code quality
@@ -187,7 +141,7 @@ ${originalPrompt}
 ## Important Constraints
 
 - Do NOT execute git commit
-- Follow all dev specs injected above
+- Follow the relevant dev specs selected from the manifest index
 - Report list of modified/created files when done`,
 
     check: isFinish ? `<!-- trellis-hook-injected -->
@@ -246,7 +200,7 @@ ${originalPrompt}
 ## Workflow
 
 1. **Get changes** - Run \`git diff --name-only\` and \`git diff\`
-2. **Check against specs** - Check item by item
+2. **Check against specs** - Use manifest reasons to select relevant sources, then check item by item
 3. **Self-fix** - Fix issues directly, don't just report
 4. **Run verification** - Run lint and typecheck
 
