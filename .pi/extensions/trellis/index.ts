@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { StringDecoder } from "node:string_decoder";
+import { delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -80,6 +81,12 @@ const MAX_LINE_BUFFER = 1024 * 1024;
 const MAX_TOOL_ARG_CHARS = 2048;
 const MAX_TOOLS = 256;
 const MAX_PARALLEL_PROMPTS = 6;
+const MAX_TASK_CONTEXT_BYTES = 128 * 1024;
+const MAX_TASK_ARTIFACT_BYTES = 64 * 1024;
+const MAX_MANIFEST_INDEX_BYTES = 32 * 1024;
+const MAX_MANIFEST_SOURCE_BYTES = 256 * 1024;
+const MAX_MANIFEST_ENTRIES = 256;
+const MAX_REASON_CHARS = 240;
 const ABORT_KILL_GRACE_MS = 1500;
 const SESSION_OVERVIEW_TIMEOUT_MS = 1500;
 const THROTTLE_MS = 500;
@@ -399,6 +406,153 @@ function readText(p: string) {
   } catch {
     return "";
   }
+}
+function readLimitedBytes(p: string, limit: number): Buffer | null {
+  let fd: number | null = null;
+  try {
+    fd = openSync(p, "r");
+    const buffer = Buffer.alloc(limit + 1);
+    const count = readSync(fd, buffer, 0, buffer.length, 0);
+    return buffer.subarray(0, count);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {}
+    }
+  }
+}
+function utf8Prefix(bytes: Buffer, limit: number): string {
+  return new StringDecoder("utf8").write(bytes.subarray(0, Math.max(0, limit)));
+}
+function truncateUtf8(text: string, limit: number, notice: string): string {
+  const bytes = Buffer.from(text, "utf8");
+  if (bytes.length <= limit) return text;
+  const suffix = Buffer.from(`\n\n${notice}`, "utf8");
+  if (suffix.length >= limit) return utf8Prefix(suffix, limit);
+  return utf8Prefix(bytes, limit - suffix.length) + suffix.toString("utf8");
+}
+function readBoundedArtifactDetailed(
+  path: string,
+  displayPath: string,
+): { content: string; truncated: boolean } {
+  const bytes = readLimitedBytes(path, MAX_TASK_ARTIFACT_BYTES);
+  if (!bytes) return { content: "", truncated: false };
+  // Flush the decoder so a partial trailing multi-byte sequence becomes U+FFFD
+  // rather than being silently dropped (which would hide raw oversize reads).
+  // Measure rendered UTF-8 so invalid bytes cannot expand past 64 KiB via U+FFFD.
+  const decoder = new StringDecoder("utf8");
+  const text = decoder.write(bytes) + decoder.end();
+  const rawOver = bytes.length > MAX_TASK_ARTIFACT_BYTES;
+  const renderedOver = Buffer.byteLength(text, "utf8") > MAX_TASK_ARTIFACT_BYTES;
+  if (!rawOver && !renderedOver) return { content: text, truncated: false };
+  return {
+    content: truncateUtf8(
+      text,
+      MAX_TASK_ARTIFACT_BYTES,
+      `[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
+    ),
+    truncated: true,
+  };
+}
+function readBoundedArtifact(path: string, displayPath: string): string {
+  return readBoundedArtifactDetailed(path, displayPath).content;
+}
+function normalizeReason(value: unknown): string {
+  let reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  if (!reason) return "(no reason provided)";
+  // Round-trip through UTF-8 replaces unpaired surrogates with U+FFFD.
+  reason = Buffer.from(reason, "utf8").toString("utf8");
+  // Iterate by Unicode code point so a supplementary character is never split.
+  const codePoints = Array.from(reason);
+  if (codePoints.length <= MAX_REASON_CHARS) return reason;
+  return codePoints.slice(0, MAX_REASON_CHARS - 3).join("") + "...";
+}
+function isInsideRoot(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === "" || (rel !== ".." && !rel.startsWith("../") && !rel.startsWith("..\\") && !isAbsolute(rel));
+}
+function resolveManifestPath(root: string, rawPath: string): { path: string; target: string } | null {
+  const normalized = rawPath.trim().replace(/\\/g, "/");
+  if (!normalized || isAbsolute(normalized) || /^[A-Za-z]:\//.test(normalized)) return null;
+  const rootPath = resolve(root);
+  const candidate = resolve(rootPath, normalized);
+  if (!isInsideRoot(rootPath, candidate)) return null;
+  let target = candidate;
+  try {
+    target = resolve(realpathSync(candidate));
+  } catch {}
+  if (!isInsideRoot(rootPath, target)) return null;
+  // Display + dedup use the realpath-resolved repository-relative target so
+  // symlink aliases of one file collapse to a single canonical row.
+  return { path: relative(rootPath, target).replace(/\\/g, "/"), target };
+}
+function renderManifestIndex(root: string, taskDir: string, jsonlName: string): string {
+  const manifestPath = join(taskDir, jsonlName);
+  const sourceBytes = readLimitedBytes(manifestPath, MAX_MANIFEST_SOURCE_BYTES);
+  if (!sourceBytes) return "";
+  const sourceTruncated = sourceBytes.length > MAX_MANIFEST_SOURCE_BYTES;
+  let source = new StringDecoder("utf8").write(
+    sourceBytes.subarray(0, MAX_MANIFEST_SOURCE_BYTES),
+  );
+  if (sourceTruncated) {
+    const lastNewline = source.lastIndexOf("\n");
+    source = lastNewline >= 0 ? source.slice(0, lastNewline) : "";
+  }
+  const rows: string[] = [];
+  const seen = new Set<string>();
+  let entryLimitReached = false;
+  for (const line of source.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const row = JSON.parse(trimmed) as JsonObject;
+      const rawPath = str(row.file) ?? str(row.path);
+      if (!rawPath) continue;
+      const entryType = row.type === "directory" ? "directory" : "file";
+      const resolved = resolveManifestPath(root, rawPath);
+      if (!resolved) continue;
+      // Dedup by canonical path only; first accepted row wins type/reason.
+      const key = resolved.path;
+      if (seen.has(key)) continue;
+      if (rows.length >= MAX_MANIFEST_ENTRIES) {
+        entryLimitReached = true;
+        break;
+      }
+      seen.add(key);
+      const fields = [`path: ${resolved.path}`, `type: ${entryType}`];
+      try {
+        const metadata = statSync(resolved.target);
+        if (entryType === "file") fields.push(`bytes: ${metadata.size}`);
+        fields.push(`revision: ${metadata.mtimeMs}`);
+      } catch {
+        fields.push("status: missing-or-unreadable");
+      }
+      fields.push(`reason: ${normalizeReason(row.reason)}`);
+      rows.push(`- ${fields.join(" | ")}`);
+    } catch {}
+  }
+  if (rows.length === 0 && !sourceTruncated) return "";
+  const lines = [`### ${jsonlName} candidate context index (load sources on demand)`, ...rows];
+  const limitNotices: string[] = [];
+  if (entryLimitReached) {
+    limitNotices.push(`[Omitted additional entries from ${jsonlName} after ${MAX_MANIFEST_ENTRIES}; load the manifest on demand.]`);
+  }
+  if (sourceTruncated) {
+    limitNotices.push(`[Stopped reading ${jsonlName} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`);
+  }
+  const rendered = lines.join("\n");
+  const combined = [rendered, ...limitNotices].join("\n");
+  if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
+    return combined;
+  }
+  return truncateUtf8(
+    combined,
+    MAX_MANIFEST_INDEX_BYTES,
+    [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "),
+  );
 }
 function exists(p: string) {
   try {
@@ -900,37 +1054,28 @@ function buildContext(root: string, agent: string, key: string | null): string {
   const dir = readTaskDir(root, key);
   if (!dir)
     return "No active Trellis task found. Read .trellis/ before proceeding.";
-  const prd = readText(join(dir, "prd.md"));
-  const design = readText(join(dir, "design.md"));
-  const impl = readText(join(dir, "implement.md"));
+  const displayTaskDir = relative(resolve(root), resolve(dir)).replace(/\\/g, "/") || ".";
   const jsonlName = TRELLIS_AGENT_JSONL[agent] ?? "";
-  let spec = "";
-  if (jsonlName) {
-    const chunks: string[] = [];
-    for (const line of readText(join(dir, jsonlName)).split(/\r?\n/)) {
-      const t = line.trim();
-      if (!t) continue;
-      try {
-        const r = JSON.parse(t) as JsonObject;
-        const f = typeof r.file === "string" ? r.file : "";
-        if (f) {
-          const c = readText(join(root, f));
-          if (c) chunks.push(`## ${f}\n\n${c}`);
-        }
-      } catch {}
-    }
-    spec = chunks.join("\n\n---\n\n");
-  }
-  return [
+  const parts = [
     `## Trellis Task Context`,
-    `Task directory: ${dir}`,
-    "",
-    "### prd.md",
-    prd || "(missing)",
-    design ? "\n### design.md\n" + design : "",
-    impl ? "\n### implement.md\n" + impl : "",
-    spec ? "\n### Curated Spec / Research Context\n" + spec : "",
-  ].join("\n");
+    `Task directory: ${displayTaskDir}`,
+  ];
+  if (jsonlName) {
+    const index = renderManifestIndex(root, dir, jsonlName);
+    if (index) parts.push(index);
+  }
+  const truncatedArtifacts: string[] = [];
+  for (const [name, label] of [["prd.md", "Requirements"], ["design.md", "Technical Design"], ["implement.md", "Execution Plan"]] as const) {
+    const displayPath = `${displayTaskDir}/${name}`;
+    const { content, truncated } = readBoundedArtifactDetailed(join(dir, name), displayPath);
+    if (truncated) truncatedArtifacts.push(displayPath);
+    if (content) parts.push(`### ${displayPath} (${label})\n${content}`);
+  }
+  return truncateUtf8(
+    parts.join("\n\n"),
+    MAX_TASK_CONTEXT_BYTES,
+    `[Task context for ${displayTaskDir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`,
+  );
 }
 
 function normalizeAgent(agent: string | undefined): string {

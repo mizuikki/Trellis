@@ -111,10 +111,10 @@ Inject relevant specs when a subagent is invoked.
 **Flow:**
 1. Read `subagent_type` from tool input
 2. Find active task through the session-scoped resolver
-3. Load `{subagent_type}.jsonl` from task directory
-4. Read each file listed in JSONL
-5. Build augmented prompt with context
-6. Update `task.json` with current phase
+3. Load `{subagent_type}.jsonl` from the task directory as a bounded metadata index
+4. Preserve referenced source bodies for reason-based, on-demand reads
+5. Add bounded task artifacts and the metadata index to the prompt
+6. Keep active-task and role routing unchanged
 
 **Output format:**
 ```json

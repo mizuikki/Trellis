@@ -5,14 +5,22 @@
  * JSONL parsing, and context building capabilities.
  */
 
-import { existsSync, readFileSync, appendFileSync, readdirSync } from "fs"
-import { isAbsolute, join } from "path"
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "fs"
+import { isAbsolute, join, relative, resolve } from "path"
+import { StringDecoder } from "string_decoder"
+import { Buffer } from "buffer"
 import { platform } from "os"
 import { execSync } from "child_process"
 import { createHash } from "crypto"
 import process from "process"
 
 const PYTHON_CMD = platform() === "win32" ? "python" : "python3"
+const MAX_TASK_CONTEXT_BYTES = 128 * 1024
+const MAX_TASK_ARTIFACT_BYTES = 64 * 1024
+const MAX_MANIFEST_INDEX_BYTES = 32 * 1024
+const MAX_MANIFEST_SOURCE_BYTES = 256 * 1024
+const MAX_MANIFEST_ENTRIES = 256
+const MAX_REASON_CHARS = 240
 // Debug logging
 const DEBUG_LOG = "/tmp/trellis-plugin-debug.log"
 
@@ -282,73 +290,190 @@ export class TrellisContext {
   // JSONL Reading
   // ============================================================
 
-  readDirectoryMdFiles(dirPath, maxFiles = 20) {
-    const results = []
-    const fullPath = join(this.directory, dirPath)
-
-    if (!existsSync(fullPath)) {
-      return results
-    }
-
+  readLimitedBytes(filePath, limit) {
+    let fd = null
     try {
-      const files = readdirSync(fullPath)
-        .filter(f => f.endsWith(".md"))
-        .sort()
-        .slice(0, maxFiles)
-
-      for (const filename of files) {
-        const filePath = join(dirPath, filename)
-        const content = this.readProjectFile(filePath)
-        if (content) {
-          results.push({ path: filePath, content })
-        }
-      }
+      fd = openSync(filePath, "r")
+      const buffer = Buffer.alloc(limit + 1)
+      const count = readSync(fd, buffer, 0, buffer.length, 0)
+      return buffer.subarray(0, count)
     } catch {
-      // Ignore directory read errors
-    }
-
-    return results
-  }
-
-  /**
-   * Read a JSONL file and load referenced files/directories
-   * Supports:
-   *   {"file": "path/to/file.md", "reason": "..."}
-   *   {"file": "path/to/dir/", "type": "directory", "reason": "..."}
-   */
-  readJsonlWithFiles(jsonlPath) {
-    const results = []
-    const content = this.readFile(jsonlPath)
-    if (!content) return results
-
-    for (const line of content.split("\n")) {
-      if (!line.trim()) continue
-      try {
-        const item = JSON.parse(line)
-        const file = item.file || item.path
-        const entryType = item.type || "file"
-
-        if (!file) continue
-
-        if (entryType === "directory") {
-          const dirEntries = this.readDirectoryMdFiles(file)
-          results.push(...dirEntries)
-        } else {
-          const fullPath = join(this.directory, file)
-          const fileContent = this.readFile(fullPath)
-          if (fileContent) {
-            results.push({ path: file, content: fileContent })
-          }
+      return null
+    } finally {
+      if (fd !== null) {
+        try {
+          closeSync(fd)
+        } catch {
+          // Ignore close errors after a failed read.
         }
-      } catch {
-        // Ignore parse errors for individual lines
       }
     }
-    return results
   }
 
-  buildContextFromEntries(entries) {
-    return entries.map(e => `=== ${e.path} ===\n${e.content}`).join("\n\n")
+  utf8Prefix(bytes, limit) {
+    return new StringDecoder("utf8").write(bytes.subarray(0, Math.max(0, limit)))
+  }
+
+  truncateUtf8(text, limit, notice) {
+    const bytes = Buffer.from(text, "utf8")
+    if (bytes.length <= limit) return text
+    const suffix = Buffer.from(`\n\n${notice}`, "utf8")
+    if (suffix.length >= limit) return this.utf8Prefix(suffix, limit)
+    return this.utf8Prefix(bytes, limit - suffix.length) + suffix.toString("utf8")
+  }
+
+  readBoundedArtifactDetailed(filePath, displayPath) {
+    const bytes = this.readLimitedBytes(filePath, MAX_TASK_ARTIFACT_BYTES)
+    if (!bytes) return { content: "", truncated: false }
+    // Flush the decoder so a partial trailing multi-byte sequence becomes U+FFFD
+    // rather than being silently dropped (which would hide raw oversize reads).
+    // Measure rendered UTF-8 so invalid bytes cannot expand past 64 KiB via U+FFFD.
+    const decoder = new StringDecoder("utf8")
+    const text = decoder.write(bytes) + decoder.end()
+    const rawOver = bytes.length > MAX_TASK_ARTIFACT_BYTES
+    const renderedOver = Buffer.byteLength(text, "utf8") > MAX_TASK_ARTIFACT_BYTES
+    if (!rawOver && !renderedOver) return { content: text, truncated: false }
+    return {
+      content: this.truncateUtf8(
+        text,
+        MAX_TASK_ARTIFACT_BYTES,
+        `[Truncated ${displayPath} at ${MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; load the remainder on demand.]`,
+      ),
+      truncated: true,
+    }
+  }
+
+  readBoundedArtifact(filePath, displayPath) {
+    return this.readBoundedArtifactDetailed(filePath, displayPath).content
+  }
+
+  resolveManifestPath(rawPath) {
+    const normalized = typeof rawPath === "string" ? rawPath.trim().replace(/\\/g, "/") : ""
+    if (!normalized || isAbsolute(normalized) || /^[A-Za-z]:\//.test(normalized)) return null
+    try {
+      const root = realpathSync(this.directory)
+      const candidate = resolve(root, normalized)
+      const rel = relative(root, candidate)
+      if (rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) return null
+      let target = candidate
+      try {
+        target = realpathSync(candidate)
+      } catch {
+        // Missing entries remain discoverable in the index.
+      }
+      const targetRel = relative(root, target)
+      if (targetRel === ".." || targetRel.startsWith("../") || targetRel.startsWith("..\\") || isAbsolute(targetRel)) return null
+      // Display + dedup use the realpath-resolved repository-relative target so
+      // symlink aliases of one file collapse to a single canonical row.
+      return { path: targetRel.replace(/\\/g, "/"), target }
+    } catch {
+      return null
+    }
+  }
+
+  normalizeReason(value) {
+    let reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : ""
+    if (!reason) return "(no reason provided)"
+    // Round-trip through UTF-8 replaces unpaired surrogates with U+FFFD.
+    reason = Buffer.from(reason, "utf8").toString("utf8")
+    // Iterate by Unicode code point so a supplementary character is never split.
+    const codePoints = Array.from(reason)
+    if (codePoints.length <= MAX_REASON_CHARS) return reason
+    return codePoints.slice(0, MAX_REASON_CHARS - 3).join("") + "..."
+  }
+
+  buildManifestIndex(jsonlPath) {
+    const sourceBytes = this.readLimitedBytes(jsonlPath, MAX_MANIFEST_SOURCE_BYTES)
+    if (!sourceBytes) return ""
+    const sourceTruncated = sourceBytes.length > MAX_MANIFEST_SOURCE_BYTES
+    let source = new StringDecoder("utf8").write(
+      sourceBytes.subarray(0, MAX_MANIFEST_SOURCE_BYTES),
+    )
+    if (sourceTruncated) {
+      const lastNewline = source.lastIndexOf("\n")
+      source = lastNewline >= 0 ? source.slice(0, lastNewline) : ""
+    }
+
+    const rows = []
+    const seen = new Set()
+    let entryLimitReached = false
+    for (const line of source.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        const entry = JSON.parse(trimmed)
+        const rawPath = entry.file || entry.path
+        if (typeof rawPath !== "string" || !rawPath.trim()) continue
+        const entryType = entry.type === "directory" ? "directory" : "file"
+        const resolved = this.resolveManifestPath(rawPath)
+        if (!resolved) continue
+        // Dedup by canonical path only; first accepted row wins type/reason.
+        const key = resolved.path
+        if (seen.has(key)) continue
+        if (rows.length >= MAX_MANIFEST_ENTRIES) {
+          entryLimitReached = true
+          break
+        }
+        seen.add(key)
+        const fields = [`path: ${resolved.path}`, `type: ${entryType}`]
+        try {
+          const metadata = statSync(resolved.target)
+          if (entryType === "file") fields.push(`bytes: ${metadata.size}`)
+          fields.push(`revision: ${metadata.mtimeMs}`)
+        } catch {
+          fields.push("status: missing-or-unreadable")
+        }
+        fields.push(`reason: ${this.normalizeReason(entry.reason)}`)
+        rows.push(`- ${fields.join(" | ")}`)
+      } catch {
+        // Seed rows and malformed lines are non-fatal.
+      }
+    }
+    if (rows.length === 0 && !sourceTruncated) return ""
+    const displayPath = relative(this.directory, jsonlPath).replace(/\\/g, "/")
+    const lines = [`=== ${displayPath} (candidate context index; load sources on demand) ===`, ...rows]
+    const limitNotices = []
+    if (entryLimitReached) {
+      limitNotices.push(`[Omitted additional entries from ${displayPath} after ${MAX_MANIFEST_ENTRIES}; load the manifest on demand.]`)
+    }
+    if (sourceTruncated) {
+      limitNotices.push(`[Stopped reading ${displayPath} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`)
+    }
+    const rendered = lines.join("\n")
+    const combined = [rendered, ...limitNotices].join("\n")
+    if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
+      return combined
+    }
+    return this.truncateUtf8(
+      combined,
+      MAX_MANIFEST_INDEX_BYTES,
+      [`[Truncated rendered index for ${displayPath}; load the manifest on demand.]`, ...limitNotices].join(" "),
+    )
+  }
+
+  buildTaskContext(taskDir, jsonlNames) {
+    const displayTaskDir = relative(this.directory, taskDir).replace(/\\/g, "/") || "."
+    const parts = [`Task directory: ${displayTaskDir}`]
+    for (const jsonlName of jsonlNames) {
+      const index = this.buildManifestIndex(join(taskDir, jsonlName))
+      if (index) parts.push(index)
+    }
+    const truncatedArtifacts = []
+    for (const [name, label] of [
+      ["prd.md", "Requirements"],
+      ["design.md", "Technical Design"],
+      ["implement.md", "Execution Plan"],
+    ]) {
+      const displayPath = `${displayTaskDir}/${name}`
+      const { content, truncated } = this.readBoundedArtifactDetailed(join(taskDir, name), displayPath)
+      if (truncated) truncatedArtifacts.push(displayPath)
+      if (content) parts.push(`=== ${displayPath} (${label}) ===\n${content}`)
+    }
+    return this.truncateUtf8(
+      parts.join("\n\n"),
+      MAX_TASK_CONTEXT_BYTES,
+      `[Task context for ${displayTaskDir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`,
+    )
   }
 }
 

@@ -28,6 +28,7 @@ warnings.filterwarnings("ignore")
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,13 @@ if sys.platform.startswith("win"):
 DIR_WORKFLOW = ".trellis"
 DIR_SPEC = "spec"
 FILE_TASK_JSON = "task.json"
+
+MAX_TASK_CONTEXT_BYTES = 128 * 1024
+MAX_TASK_ARTIFACT_BYTES = 64 * 1024
+MAX_MANIFEST_INDEX_BYTES = 32 * 1024
+MAX_MANIFEST_SOURCE_BYTES = 256 * 1024
+MAX_MANIFEST_ENTRIES = 256
+MAX_REASON_CHARS = 240
 
 # =============================================================================
 # Subagent Constants (change here to rename subagent types)
@@ -131,119 +139,164 @@ def get_current_task(repo_root: str, input_data: dict) -> str | None:
     return active.task_path
 
 
-def read_file_content(base_path: str, file_path: str) -> str | None:
-    """Read file content, return None if file doesn't exist"""
-    full_path = os.path.join(base_path, file_path)
-    if os.path.exists(full_path) and os.path.isfile(full_path):
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
-            return None
-    return None
+def _truncate_utf8(text: str, limit: int, notice: str) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
+        return text
+    suffix = f"\n\n{notice}".encode("utf-8")
+    if len(suffix) >= limit:
+        return suffix[:limit].decode("utf-8", errors="ignore")
+    prefix = encoded[: limit - len(suffix)].decode("utf-8", errors="ignore")
+    return prefix + suffix.decode("utf-8")
 
 
-def read_directory_contents(
-    base_path: str, dir_path: str, max_files: int = 20
-) -> list[tuple[str, str]]:
-    """
-    Read all .md files in a directory
+def _unicode_safe(text: str) -> str:
+    """Replace unpaired surrogates so later UTF-8 encoding never raises."""
+    return "".join(
+        "\ufffd" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text
+    )
 
-    Args:
-        base_path: Base path (usually repo_root)
-        dir_path: Directory relative path
-        max_files: Max files to read (prevent huge directories)
 
-    Returns:
-        [(file_path, content), ...]
-    """
-    full_path = os.path.join(base_path, dir_path)
-    if not os.path.exists(full_path) or not os.path.isdir(full_path):
-        return []
-
-    results = []
+def _read_bounded_artifact_detailed(
+    repo_root: str, relative_path: str
+) -> tuple[str | None, bool]:
+    """Return (content, truncated). truncated is structural, never inferred from text."""
+    full_path = Path(repo_root) / relative_path
     try:
-        # Only read .md files, sorted by filename
-        md_files = sorted(
-            [
-                f
-                for f in os.listdir(full_path)
-                if f.endswith(".md") and os.path.isfile(os.path.join(full_path, f))
-            ]
-        )
-
-        for filename in md_files[:max_files]:
-            file_full_path = os.path.join(full_path, filename)
-            relative_path = os.path.join(dir_path, filename)
-            try:
-                with open(file_full_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    results.append((relative_path, content))
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    return results
+        with full_path.open("rb") as stream:
+            raw = stream.read(MAX_TASK_ARTIFACT_BYTES + 1)
+    except OSError:
+        return None, False
+    text = raw.decode("utf-8", errors="replace")
+    # Enforce the ceiling on rendered UTF-8 bytes, not just raw disk bytes.
+    # Invalid sequences expand under replacement decoding (U+FFFD is 3 bytes).
+    # Also truncate when the raw read overshot — more content remains on disk.
+    raw_over = len(raw) > MAX_TASK_ARTIFACT_BYTES
+    rendered_over = len(text.encode("utf-8")) > MAX_TASK_ARTIFACT_BYTES
+    if not raw_over and not rendered_over:
+        return text, False
+    notice = (
+        f"[Truncated {relative_path} at {MAX_TASK_ARTIFACT_BYTES} UTF-8 bytes; "
+        "load the remainder on demand.]"
+    )
+    return _truncate_utf8(text, MAX_TASK_ARTIFACT_BYTES, notice), True
 
 
-def read_jsonl_entries(base_path: str, jsonl_path: str) -> list[tuple[str, str]]:
-    """
-    Read all file/directory contents referenced in jsonl file
+def _read_bounded_artifact(repo_root: str, relative_path: str) -> str | None:
+    content, _truncated = _read_bounded_artifact_detailed(repo_root, relative_path)
+    return content
 
-    Schema:
-        {"file": "path/to/file.md", "reason": "..."}
-        {"file": "path/to/dir/", "type": "directory", "reason": "..."}
-        {"_example": "..."}          # seed row — skipped (no `file` field)
 
-    Rows without a ``file`` field (e.g. the self-describing seed line written
-    by ``task.py create`` before the agent has curated entries) are skipped
-    silently. If the resulting entry list is empty, a stderr warning is
-    emitted so the operator can debug missing context.
+def _normalize_reason(value: object) -> str:
+    if not isinstance(value, str):
+        return "(no reason provided)"
+    reason = " ".join(_unicode_safe(value).split())
+    if not reason:
+        return "(no reason provided)"
+    # len()/slice operate on Unicode scalar values in Python 3.
+    if len(reason) <= MAX_REASON_CHARS:
+        return reason
+    return reason[: MAX_REASON_CHARS - 3] + "..."
 
-    Returns:
-        [(path, content), ...]
-    """
-    full_path = os.path.join(base_path, jsonl_path)
-    if not os.path.exists(full_path):
+
+def _resolve_manifest_entry(
+    repo_root: Path, raw_path: str, entry_type: str, reason: str
+) -> tuple[str, str, str, int | None, int | None, str | None] | None:
+    normalized = raw_path.strip().replace("\\", "/")
+    if not normalized or normalized.startswith("/") or re.match(r"^[A-Za-z]:/", normalized):
+        return None
+    try:
+        root = repo_root.resolve()
+        candidate = (root / normalized).resolve()
+        display_path = candidate.relative_to(root).as_posix()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+    size: int | None = None
+    revision: int | None = None
+    status: str | None = None
+    try:
+        metadata = candidate.stat()
+        revision = metadata.st_mtime_ns
+        if entry_type == "file":
+            size = metadata.st_size
+    except FileNotFoundError:
+        status = "missing"
+    except (OSError, ValueError):
+        status = "unreadable"
+
+    return display_path, entry_type, reason, size, revision, status
+
+
+def _render_manifest_entry(
+    entry: tuple[str, str, str, int | None, int | None, str | None],
+) -> str:
+    path, entry_type, reason, size, revision, status = entry
+    fields = [f"path: {path}", f"type: {entry_type}"]
+    if size is not None:
+        fields.append(f"bytes: {size}")
+    if revision is not None:
+        fields.append(f"revision: {revision}")
+    if status:
+        fields.append(f"status: {status}")
+    fields.append(f"reason: {reason}")
+    return "- " + " | ".join(fields)
+
+
+def read_jsonl_index(base_path: str, jsonl_path: str) -> str:
+    full_path = Path(base_path) / jsonl_path
+    try:
+        with full_path.open("rb") as stream:
+            raw = stream.read(MAX_MANIFEST_SOURCE_BYTES + 1)
+    except FileNotFoundError:
         print(
             f"[inject-subagent-context] WARN: {jsonl_path} not found — "
             f"sub-agent will receive only task artifacts",
             file=sys.stderr,
         )
-        return []
+        return ""
+    except OSError:
+        return ""
 
-    results = []
+    source_truncated = len(raw) > MAX_MANIFEST_SOURCE_BYTES
+    source = raw[:MAX_MANIFEST_SOURCE_BYTES].decode("utf-8", errors="ignore")
+    if source_truncated:
+        last_newline = source.rfind("\n")
+        source = source[:last_newline] if last_newline >= 0 else ""
+
+    entries: list[tuple[str, str, str, int | None, int | None, str | None]] = []
+    seen: set[str] = set()
+    entry_limit_reached = False
     saw_real_entry = False
-    try:
-        with open(full_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                    file_path = item.get("file") or item.get("path")
-                    entry_type = item.get("type", "file")
-
-                    if not file_path:
-                        # Seed / comment row — skip silently
-                        continue
-
-                    saw_real_entry = True
-                    if entry_type == "directory":
-                        # Read all .md files in directory
-                        dir_contents = read_directory_contents(base_path, file_path)
-                        results.extend(dir_contents)
-                    else:
-                        # Read single file
-                        content = read_file_content(base_path, file_path)
-                        if content:
-                            results.append((file_path, content))
-                except json.JSONDecodeError:
-                    continue
-    except Exception:
-        pass
+    for line in source.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            item = json.loads(stripped)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(item, dict):
+            continue
+        file_path = item.get("file") or item.get("path")
+        if not isinstance(file_path, str) or not file_path.strip():
+            continue
+        saw_real_entry = True
+        entry_type = "directory" if item.get("type") == "directory" else "file"
+        entry = _resolve_manifest_entry(
+            Path(base_path), file_path, entry_type, _normalize_reason(item.get("reason"))
+        )
+        if entry is None:
+            continue
+        # Dedup by canonical path only; first accepted row wins type/reason.
+        key = entry[0]
+        if key in seen:
+            continue
+        if len(entries) >= MAX_MANIFEST_ENTRIES:
+            entry_limit_reached = True
+            break
+        seen.add(key)
+        entries.append(entry)
 
     if not saw_real_entry:
         print(
@@ -252,91 +305,76 @@ def read_jsonl_entries(base_path: str, jsonl_path: str) -> list[tuple[str, str]]
             f"task artifacts. See workflow.md planning artifact guidance.",
             file=sys.stderr,
         )
+    if not entries and not source_truncated:
+        return ""
 
-    return results
-
-
+    lines = [f"=== {jsonl_path} (candidate context index; load sources on demand) ==="]
+    lines.extend(_render_manifest_entry(entry) for entry in entries)
+    limit_notices: list[str] = []
+    if entry_limit_reached:
+        limit_notices.append(
+            f"[Omitted additional entries from {jsonl_path} after "
+            f"{MAX_MANIFEST_ENTRIES}; load the manifest on demand.]"
+        )
+    if source_truncated:
+        limit_notices.append(
+            f"[Stopped reading {jsonl_path} after {MAX_MANIFEST_SOURCE_BYTES} bytes; "
+            "load the remainder on demand.]"
+        )
+    rendered = "\n".join(lines)
+    combined = "\n".join([rendered, *limit_notices])
+    if len(combined.encode("utf-8")) <= MAX_MANIFEST_INDEX_BYTES:
+        return combined
+    return _truncate_utf8(
+        combined,
+        MAX_MANIFEST_INDEX_BYTES,
+        " ".join([f"[Truncated rendered index for {jsonl_path}; load the manifest on demand.]", *limit_notices]),
+    )
 
 
 def get_agent_context(repo_root: str, task_dir: str, agent_type: str) -> str:
-    """
-    Get context from {agent_type}.jsonl for the specified agent.
-    Only reads implement.jsonl or check.jsonl (the two JSONL files the task system creates).
-    """
-    context_parts = []
+    """Build a bounded metadata index for implement.jsonl or check.jsonl."""
+    return read_jsonl_index(repo_root, f"{task_dir}/{agent_type}.jsonl")
 
-    agent_jsonl = f"{task_dir}/{agent_type}.jsonl"
-    for file_path, content in read_jsonl_entries(repo_root, agent_jsonl):
-        context_parts.append(f"=== {file_path} ===\n{content}")
 
-    return "\n\n".join(context_parts)
+def _build_task_context(repo_root: str, task_dir: str, agent_type: str) -> str:
+    parts = [f"Task directory: {task_dir}"]
+    manifest_index = get_agent_context(repo_root, task_dir, agent_type)
+    if manifest_index:
+        parts.append(manifest_index)
+
+    artifacts = (
+        ("prd.md", "Requirements"),
+        ("design.md", "Technical Design"),
+        ("implement.md", "Execution Plan"),
+    )
+    truncated_artifacts: list[str] = []
+    for name, label in artifacts:
+        relative_path = f"{task_dir}/{name}"
+        content, truncated = _read_bounded_artifact_detailed(repo_root, relative_path)
+        if truncated:
+            truncated_artifacts.append(relative_path)
+        if content:
+            parts.append(f"=== {relative_path} ({label}) ===\n{content}")
+
+    combined = "\n\n".join(parts)
+    return _truncate_utf8(
+        combined,
+        MAX_TASK_CONTEXT_BYTES,
+        f"[Task context for {task_dir} exceeded {MAX_TASK_CONTEXT_BYTES} bytes; "
+        f"artifact limits applied to {', '.join(truncated_artifacts) or 'none'}; "
+        "load the remaining task artifacts and manifest sources on demand.]",
+    )
 
 
 def get_implement_context(repo_root: str, task_dir: str) -> str:
-    """
-    Complete context for Implement Agent
-
-    Read order:
-    1. All files in implement.jsonl (spec/research manifests)
-    2. prd.md (requirements)
-    3. design.md if present (technical design)
-    4. implement.md if present (execution plan)
-    """
-    context_parts = []
-
-    # 1. Read implement.jsonl
-    base_context = get_agent_context(repo_root, task_dir, "implement")
-    if base_context:
-        context_parts.append(base_context)
-
-    # 2. Requirements document
-    prd_content = read_file_content(repo_root, f"{task_dir}/prd.md")
-    if prd_content:
-        context_parts.append(f"=== {task_dir}/prd.md (Requirements) ===\n{prd_content}")
-
-    # 3. Technical design for complex tasks
-    design_content = read_file_content(repo_root, f"{task_dir}/design.md")
-    if design_content:
-        context_parts.append(
-            f"=== {task_dir}/design.md (Technical Design) ===\n{design_content}"
-        )
-
-    # 4. Execution plan for complex tasks
-    implement_plan_content = read_file_content(repo_root, f"{task_dir}/implement.md")
-    if implement_plan_content:
-        context_parts.append(
-            f"=== {task_dir}/implement.md (Execution Plan) ===\n{implement_plan_content}"
-        )
-
-    return "\n\n".join(context_parts)
+    """Build bounded task context for the implement agent."""
+    return _build_task_context(repo_root, task_dir, "implement")
 
 
 def get_check_context(repo_root: str, task_dir: str) -> str:
-    """
-    Context for Check Agent: check.jsonl + task artifacts.
-    """
-    context_parts = []
-
-    for file_path, content in read_jsonl_entries(repo_root, f"{task_dir}/check.jsonl"):
-        context_parts.append(f"=== {file_path} ===\n{content}")
-
-    prd_content = read_file_content(repo_root, f"{task_dir}/prd.md")
-    if prd_content:
-        context_parts.append(f"=== {task_dir}/prd.md (Requirements) ===\n{prd_content}")
-
-    design_content = read_file_content(repo_root, f"{task_dir}/design.md")
-    if design_content:
-        context_parts.append(
-            f"=== {task_dir}/design.md (Technical Design) ===\n{design_content}"
-        )
-
-    implement_plan_content = read_file_content(repo_root, f"{task_dir}/implement.md")
-    if implement_plan_content:
-        context_parts.append(
-            f"=== {task_dir}/implement.md (Execution Plan) ===\n{implement_plan_content}"
-        )
-
-    return "\n\n".join(context_parts)
+    """Build bounded task context for the check agent."""
+    return _build_task_context(repo_root, task_dir, "check")
 
 
 def get_finish_context(repo_root: str, task_dir: str) -> str:
@@ -357,7 +395,7 @@ You are the Implement Agent in the Multi-Agent Pipeline.
 
 ## Your Context
 
-All the information you need has been prepared for you:
+Task artifacts and a bounded manifest index have been prepared for you. Referenced source bodies remain available on disk for reason-based, on-demand reads:
 
 {context}
 
@@ -371,15 +409,15 @@ All the information you need has been prepared for you:
 
 ## Workflow
 
-1. **Understand specs** - All dev specs are injected above, understand them
-    2. **Understand task artifacts** - Read requirements, technical design if present, and execution plan if present
-    3. **Implement feature** - Implement following specs and task artifacts
+1. **Select specs** - Use manifest reasons to select relevant sources; prefer targeted search or ranged reads for large files
+2. **Understand task artifacts** - Read requirements, technical design if present, and execution plan if present
+3. **Implement feature** - Implement following selected specs and task artifacts
 4. **Self-check** - Ensure code quality against check specs
 
 ## Important Constraints
 
 - Do NOT execute git commit, only code modifications
-- Follow all dev specs injected above
+- Follow the relevant dev specs selected from the manifest index
 - Report list of modified/created files when done"""
 
 
@@ -392,7 +430,7 @@ You are the Check Agent in the Multi-Agent Pipeline (code and cross-layer checke
 
 ## Your Context
 
-All check specs and dev specs you need:
+Task artifacts and a bounded check-manifest index are prepared below. Referenced source bodies remain available on disk for reason-based, on-demand reads:
 
 {context}
 
@@ -407,7 +445,7 @@ All check specs and dev specs you need:
 ## Workflow
 
 1. **Get changes** - Run `git diff --name-only` and `git diff` to get code changes
-2. **Check against specs** - Check item by item against specs above
+2. **Check against specs** - Use manifest reasons to select relevant specs, then check item by item; prefer targeted or ranged reads for large files
 3. **Self-fix** - Fix issues directly, don't just report
 4. **Run verification** - Run project's lint and typecheck commands
 

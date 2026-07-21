@@ -72,7 +72,7 @@ Before a task enters implementation, planning may write relevant specs into `imp
 {"file": ".trellis/spec/cli/unit-test/conventions.md", "reason": "Test expectations"}
 ```
 
-Sub-agents or platform preludes read these JSONL files and load the referenced specs. On platforms without sub-agent support, the AI should read the relevant specs directly according to the workflow.
+Sub-agents or platform preludes treat these JSONL files as candidate indexes. They use reasons to select relevant specs and load those sources on demand, with targeted or ranged reads for large files. On platforms without sub-agent support, the AI should read the relevant specs directly according to the workflow.
 
 ## What Specs Should Contain
 
