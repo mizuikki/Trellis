@@ -53,13 +53,13 @@ Prevent Trellis-generated integrations from creating unbounded first model reque
 
 ## Acceptance Criteria
 
-- [ ] A 2 MiB file referenced by `implement.jsonl` or `check.jsonl` is never copied into generated task context on any eager integration path.
-- [ ] The referenced source remains discoverable through a bounded index containing its path, reason, entry type, and file metadata when applicable.
-- [ ] Direct task artifacts are capped at 64 KiB each, manifest indexes at 32 KiB, manifest source reads at 256 KiB / 256 entries, and aggregate task context at 128 KiB.
-- [ ] Each applied limit emits a UTF-8-safe notice naming the affected task artifact, manifest, or task directory and directing the agent to load remaining content on demand.
-- [ ] File and directory manifest entries remain usable; seed, malformed, duplicate, missing, and unreadable entries do not crash injection.
-- [ ] Implement/check instructions across generated platforms treat reasons as selection hints and do not direct agents to read every manifest entry wholesale.
-- [ ] Focused tests for shared hooks, Pi, OMP, and OpenCode pass, followed by CLI lint, typecheck, and the relevant regression suite.
+- [x] A 2 MiB file referenced by `implement.jsonl` or `check.jsonl` is never copied into generated task context on any eager integration path.
+- [x] The referenced source remains discoverable through a bounded index containing its path, reason, entry type, and file metadata when applicable.
+- [x] Direct task artifacts are capped at 64 KiB each, manifest indexes at 32 KiB, manifest source reads at 256 KiB / 256 entries, and aggregate task context at 128 KiB.
+- [x] Each applied limit emits a UTF-8-safe notice naming the affected task artifact, manifest, or task directory and directing the agent to load remaining content on demand.
+- [x] File and directory manifest entries remain usable; seed, malformed, duplicate, missing, and unreadable entries do not crash injection.
+- [x] Implement/check instructions across generated platforms treat reasons as selection hints and do not direct agents to read every manifest entry wholesale.
+- [x] Focused tests for shared hooks, Pi, OMP, and OpenCode pass, followed by CLI lint, typecheck, and the relevant regression suite.
 
 ## Out Of Scope
 
