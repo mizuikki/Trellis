@@ -350,6 +350,27 @@ describe("pi templates", () => {
     expect(context).toContain(".trellis/tasks/limits/implement.md");
   });
 
+  it("accepts manifest entries when the project root is reached through a symlink", () => {
+    const realRoot = mkdtempSync(join(tmpdir(), "trellis-pi-real-root-"));
+    const aliasParent = mkdtempSync(join(tmpdir(), "trellis-pi-alias-parent-"));
+    const aliasRoot = join(aliasParent, "workspace");
+    const task = join(realRoot, ".trellis", "tasks", "limits");
+    const spec = join(realRoot, ".trellis", "spec");
+    mkdirSync(task, { recursive: true });
+    mkdirSync(spec, { recursive: true });
+    writeFileSync(join(spec, "real.md"), "canonical body\n");
+    symlinkSync(realRoot, aliasRoot);
+    const internals = loadExtensionInternals(aliasRoot);
+    writeFileSync(
+      join(task, "implement.jsonl"),
+      JSON.stringify({ file: ".trellis/spec/real.md", reason: "via symlink root" }),
+    );
+    const index = internals.renderManifestIndex(aliasRoot, join(aliasRoot, ".trellis", "tasks", "limits"), "implement.jsonl");
+    expect(index).toContain("path: .trellis/spec/real.md");
+    expect(index).toContain("via symlink root");
+    expect(index).not.toContain("..");
+  });
+
   it("does not treat untruncated artifacts as limited when their body contains notice text", () => {
     const root = mkdtempSync(join(tmpdir(), "trellis-pi-notice-false-positive-"));
     const task = join(root, ".trellis", "tasks", "limits");

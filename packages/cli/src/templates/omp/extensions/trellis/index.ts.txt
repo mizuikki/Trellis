@@ -160,6 +160,13 @@ function renderManifestIndex(projectRoot: string, taskDir: string, jsonlName: st
       source = lastNewline >= 0 ? source.slice(0, lastNewline) : "";
    }
 
+   // Match resolveProjectFile: display paths must be relative to the realpath root
+   // so symlink workspaces do not emit ../-style non-repo paths.
+   let rootReal = resolve(projectRoot);
+   try {
+      rootReal = realpathSync(projectRoot);
+   } catch {}
+
    const rows: string[] = [];
    const seen = new Set<string>();
    let entryLimitReached = false;
@@ -179,7 +186,7 @@ function renderManifestIndex(projectRoot: string, taskDir: string, jsonlName: st
          if (!targetPath) continue;
          // Display + dedup use the realpath-resolved repository-relative target so
          // symlink aliases of one file collapse to a single canonical row.
-         const displayPath = relative(resolve(projectRoot), targetPath).replace(/\\/g, "/");
+         const displayPath = relative(rootReal, targetPath).replace(/\\/g, "/");
          const key = displayPath;
          if (seen.has(key)) continue;
          if (rows.length >= MAX_MANIFEST_ENTRIES) {

@@ -487,7 +487,12 @@ function isInsideRoot(root: string, candidate: string): boolean {
 function resolveManifestPath(root: string, rawPath: string): { path: string; target: string } | null {
   const normalized = rawPath.trim().replace(/\\/g, "/");
   if (!normalized || isAbsolute(normalized) || /^[A-Za-z]:\//.test(normalized)) return null;
-  const rootPath = resolve(root);
+  // Canonicalize the project root so symlink workspaces compare equal to
+  // realpath-resolved entry targets (OpenCode/OMP already do this).
+  let rootPath = resolve(root);
+  try {
+    rootPath = resolve(realpathSync(root));
+  } catch {}
   const candidate = resolve(rootPath, normalized);
   if (!isInsideRoot(rootPath, candidate)) return null;
   let target = candidate;

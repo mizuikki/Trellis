@@ -300,6 +300,31 @@ describe("omp templates", () => {
     );
   });
 
+  it("accepts manifest entries when the project root is reached through a symlink", () => {
+    const realRoot = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-real-root-"));
+    const aliasParent = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-alias-parent-"));
+    const aliasRoot = path.join(aliasParent, "workspace");
+    const task = path.join(realRoot, ".trellis", "tasks", "limits");
+    const spec = path.join(realRoot, ".trellis", "spec");
+    fs.mkdirSync(task, { recursive: true });
+    fs.mkdirSync(spec, { recursive: true });
+    fs.writeFileSync(path.join(spec, "real.md"), "canonical body\n");
+    fs.symlinkSync(realRoot, aliasRoot);
+    const internals = loadOmpExtensionInternals();
+    fs.writeFileSync(
+      path.join(task, "implement.jsonl"),
+      JSON.stringify({ file: ".trellis/spec/real.md", reason: "via symlink root" }),
+    );
+    const index = internals.renderManifestIndex(
+      aliasRoot,
+      path.join(aliasRoot, ".trellis", "tasks", "limits"),
+      "implement.jsonl",
+    );
+    expect(index).toContain("path: .trellis/spec/real.md");
+    expect(index).toContain("via symlink root");
+    expect(index).not.toMatch(/\.\.\//);
+  });
+
   it("does not treat untruncated artifacts as limited when their body contains notice text", () => {
     const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-notice-false-positive-"));
     const task = path.join(root, ".trellis", "tasks", "limits");
