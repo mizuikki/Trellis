@@ -584,6 +584,58 @@ describe("opencode TrellisContext single-session fallback", () => {
     // exact match is attempted first.
     expect(active.taskPath).toBeNull();
   });
+
+  it("enforces OpenCode artifact, entry, source, and rendered-index limits", () => {
+    const task = join(dir, ".trellis", "tasks", "demo-task");
+    const ctx = new TrellisContext(dir);
+    const artifactPath = join(task, "prd.md");
+    writeFileSync(artifactPath, `START\n${"界".repeat(90_000)}END`);
+    const artifact = ctx.readBoundedArtifact(
+      artifactPath,
+      ".trellis/tasks/demo-task/prd.md",
+    );
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain(
+      "Truncated .trellis/tasks/demo-task/prd.md at 65536 UTF-8 bytes",
+    );
+    expect(artifact).not.toContain("�");
+
+    const manifestPath = join(task, "implement.jsonl");
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/${index}.md`, reason: `entry ${index}` }),
+      ).join("\n"),
+    );
+    const entryLimited = ctx.buildManifestIndex(manifestPath);
+    expect(entryLimited.match(/^- path:/gm)).toHaveLength(256);
+    expect(entryLimited).toContain(
+      "Omitted additional entries from .trellis/tasks/demo-task/implement.jsonl after 256",
+    );
+
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 256 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
+      ).join("\n"),
+    );
+    const indexLimited = ctx.buildManifestIndex(manifestPath);
+    expect(Buffer.byteLength(indexLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(indexLimited).toContain(
+      "Truncated rendered index for .trellis/tasks/demo-task/implement.jsonl",
+    );
+    expect(indexLimited).not.toContain("�");
+
+    writeFileSync(
+      manifestPath,
+      `${JSON.stringify({ file: ".trellis/spec/first.md", reason: "first" })}\n${"x".repeat(300 * 1024)}`,
+    );
+    const sourceLimited = ctx.buildManifestIndex(manifestPath);
+    expect(sourceLimited).toContain("path: .trellis/spec/first.md");
+    expect(sourceLimited).toContain(
+      "Stopped reading .trellis/tasks/demo-task/implement.jsonl after 262144 bytes",
+    );
+  });
 });
 
 describe("opencode inject-subagent-context (issue #264)", () => {
@@ -628,16 +680,31 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     );
   });
 
-  it("inlines JSONL-referenced spec content into the implement prompt", async () => {
-    // Cover AC #1: "JSONL-referenced context" — the seed-only jsonl path
-    // is exercised above; this one verifies a curated entry is inlined.
+  it("indexes JSONL references without inlining bodies and bounds task context", async () => {
     const specPath = join(dir, ".trellis", "spec", "demo.md");
     mkdirSync(join(dir, ".trellis", "spec"), { recursive: true });
-    writeFileSync(specPath, "# Demo Spec\n\nUNIQUE_SPEC_MARKER_42");
+    const marker = "UNIQUE_SPEC_MARKER_42";
+    writeFileSync(specPath, `${marker}\n${"x".repeat(2 * 1024 * 1024)}`);
     writeFileSync(
       join(dir, ".trellis", "tasks", "demo-task", "implement.jsonl"),
-      JSON.stringify({ file: ".trellis/spec/demo.md", reason: "test" }) + "\n",
+      [
+        JSON.stringify({
+          file: ".trellis/spec/demo.md",
+          reason: "OpenCode metadata reason",
+        }),
+        JSON.stringify({
+          path: ".trellis/spec",
+          type: "directory",
+          reason: "OpenCode directory",
+        }),
+        "{bad",
+        JSON.stringify({ _example: "seed" }),
+      ].join("\n"),
     );
+    const taskDir = join(dir, ".trellis", "tasks", "demo-task");
+    writeFileSync(join(taskDir, "prd.md"), `PRD_START\n${"界".repeat(90_000)}PRD_END`);
+    writeFileSync(join(taskDir, "design.md"), `DESIGN_START\n${"计".repeat(90_000)}`);
+    writeFileSync(join(taskDir, "implement.md"), `PLAN_START\n${"划".repeat(90_000)}`);
     writeSessionFile(dir, "opencode_sole", ".trellis/tasks/demo-task");
 
     const output: TaskToolOutput = {
@@ -653,9 +720,17 @@ describe("opencode inject-subagent-context (issue #264)", () => {
     );
 
     expect(output.args.prompt).toContain("<!-- trellis-hook-injected -->");
-    expect(output.args.prompt).toContain("=== .trellis/spec/demo.md ===");
-    expect(output.args.prompt).toContain("UNIQUE_SPEC_MARKER_42");
-    expect(output.args.prompt).toContain("Demo PRD");
+    expect(Buffer.byteLength(output.args.prompt ?? "", "utf8")).toBeLessThan(
+      140 * 1024,
+    );
+    expect(output.args.prompt).not.toContain(marker);
+    expect(output.args.prompt).toContain(".trellis/spec/demo.md");
+    expect(output.args.prompt).toContain("OpenCode metadata reason");
+    expect(output.args.prompt).toContain("type: file");
+    expect(output.args.prompt).toContain("type: directory");
+    expect(output.args.prompt).not.toContain("PRD_END");
+    expect(output.args.prompt).not.toContain("�");
+    expect(output.args.prompt).toContain("load the remainder on demand");
   });
 
   it("mutates check prompt using Active task hint when runtime resolution fails", async () => {

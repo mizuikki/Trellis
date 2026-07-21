@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -19,8 +20,20 @@ type OmpExtension = (pi: {
   on: (event: string, handler: OmpEventHandler) => void;
 }) => void;
 
-function loadOmpExtension(): OmpExtension {
-  const compiled = ts.transpileModule(getExtensionTemplate(), {
+interface OmpExtensionInternals {
+  default?: OmpExtension;
+  buildTaskContext: (
+    projectRoot: string,
+    taskDir: string,
+    agentType?: "trellis-implement" | "trellis-check" | "trellis-research" | null,
+  ) => string;
+  readBoundedArtifact: (path: string, displayPath: string) => string;
+  renderManifestIndex: (projectRoot: string, taskDir: string, jsonlName: string) => string;
+}
+
+function loadOmpExtensionInternals(): OmpExtensionInternals {
+  const source = `${getExtensionTemplate()}\nexport { buildTaskContext, readBoundedArtifact, renderManifestIndex };\n`;
+  const compiled = ts.transpileModule(source, {
     compilerOptions: {
       esModuleInterop: true,
       module: ts.ModuleKind.CommonJS,
@@ -28,7 +41,9 @@ function loadOmpExtension(): OmpExtension {
     },
   }).outputText;
   const require = createRequire(import.meta.url);
-  const moduleObject: { exports: { default?: OmpExtension } } = { exports: {} };
+  const moduleObject: { exports: OmpExtensionInternals | Record<string, never> } = {
+    exports: {},
+  };
   const sandboxProcess = Object.create(process) as NodeJS.Process;
   const sandboxEnv = { ...process.env };
   delete sandboxEnv.TRELLIS_CONTEXT_ID;
@@ -42,7 +57,11 @@ function loadOmpExtension(): OmpExtension {
     require,
   });
   vm.runInContext(compiled, sandbox);
-  const extension = moduleObject.exports.default;
+  return moduleObject.exports as OmpExtensionInternals;
+}
+
+function loadOmpExtension(): OmpExtension {
+  const extension = loadOmpExtensionInternals().default;
   if (!extension) throw new Error("OMP extension template has no default export");
   return extension;
 }
@@ -56,6 +75,90 @@ function captureOmpHandlers(): Map<string, OmpEventHandler> {
 }
 
 describe("omp templates", () => {
+  it("buildTaskContext bounds metadata indexes and aggregate UTF-8 bytes", () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-bounded-context-"));
+    const task = path.join(root, ".trellis", "tasks", "bounded-context");
+    fs.mkdirSync(path.join(root, ".trellis", "spec"), { recursive: true });
+    fs.mkdirSync(task, { recursive: true });
+    const marker = "OMP_REFERENCED_BODY_MARKER";
+    fs.writeFileSync(
+      path.join(root, ".trellis", "spec", "large.md"),
+      `${marker}\n${"x".repeat(2 * 1024 * 1024)}`,
+    );
+    fs.writeFileSync(
+      path.join(task, "implement.jsonl"),
+      [
+        JSON.stringify({ file: ".trellis/spec/large.md", reason: "OMP metadata reason" }),
+        JSON.stringify({ path: ".trellis/spec", type: "directory", reason: "OMP directory" }),
+        "{bad",
+      ].join("\n"),
+    );
+    fs.writeFileSync(path.join(task, "prd.md"), `PRD_START\n${"界".repeat(90_000)}PRD_END`);
+    fs.writeFileSync(path.join(task, "design.md"), `DESIGN_START\n${"计".repeat(90_000)}`);
+    fs.writeFileSync(path.join(task, "implement.md"), `PLAN_START\n${"划".repeat(90_000)}`);
+
+    const context = loadOmpExtensionInternals().buildTaskContext(
+      root,
+      task,
+      "trellis-implement",
+    );
+
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    expect(context).not.toContain(marker);
+    expect(context).toContain(".trellis/spec/large.md");
+    expect(context).toContain("OMP metadata reason");
+    expect(context).toContain("type: file");
+    expect(context).toContain("type: directory");
+    expect(context).not.toContain("PRD_END");
+    expect(context).not.toContain("�");
+    expect(context).toContain("load the remainder on demand");
+    expect(context).toContain(`${path.relative(root, task).replace(/\\/g, "/")}/design.md`);
+    expect(context).toContain(`${path.relative(root, task).replace(/\\/g, "/")}/implement.md`);
+  });
+
+  it("enforces OMP artifact, entry, source, and rendered-index limits", () => {
+    const root = fs.mkdtempSync(path.join(tmpdir(), "trellis-omp-all-limits-"));
+    const task = path.join(root, ".trellis", "tasks", "limits");
+    fs.mkdirSync(task, { recursive: true });
+    const internals = loadOmpExtensionInternals();
+    const artifactPath = path.join(task, "prd.md");
+    fs.writeFileSync(artifactPath, `START\n${"界".repeat(90_000)}END`);
+    const artifact = internals.readBoundedArtifact(artifactPath, ".trellis/tasks/limits/prd.md");
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain("Truncated .trellis/tasks/limits/prd.md at 65536 UTF-8 bytes");
+    expect(artifact).not.toContain("�");
+
+    const manifestPath = path.join(task, "implement.jsonl");
+    fs.writeFileSync(
+      manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/${index}.md`, reason: `entry ${index}` }),
+      ).join("\n"),
+    );
+    const entryLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(entryLimited.match(/^- path:/gm)).toHaveLength(256);
+    expect(entryLimited).toContain("Omitted additional entries from implement.jsonl after 256");
+
+    fs.writeFileSync(
+      manifestPath,
+      Array.from({ length: 256 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
+      ).join("\n"),
+    );
+    const indexLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(Buffer.byteLength(indexLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(indexLimited).toContain("Truncated rendered index for implement.jsonl");
+    expect(indexLimited).not.toContain("�");
+
+    fs.writeFileSync(
+      manifestPath,
+      `${JSON.stringify({ file: ".trellis/spec/first.md", reason: "first" })}\n${"x".repeat(300 * 1024)}`,
+    );
+    const sourceLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(sourceLimited).toContain("path: .trellis/spec/first.md");
+    expect(sourceLimited).toContain("Stopped reading implement.jsonl after 262144 bytes");
+  });
+
   it("provides the three Trellis sub-agent definitions", () => {
     const agents = getAllAgents();
     expect(agents.map((agent) => agent.name).sort()).toEqual([
@@ -92,8 +195,8 @@ describe("omp templates", () => {
     expect(extension).not.toContain("process.env.TRELLIS_CONTEXT_ID =");
     expect(extension).toContain('buildContextKey("omp", "session", sessionId)');
     expect(extension).toContain("realpathSync");
-    expect(extension).toContain("resolveProjectFile(projectRoot, file)");
-    expect(extension).toContain("readFileSync(targetPath");
+    expect(extension).toContain("resolveProjectFile(projectRoot, rawPath)");
+    expect(extension).not.toContain("readFileSync(targetPath");
     expect(extension).toContain("if (!key) return null;");
     expect(extension).toContain("return key;");
     expect(extension).toContain(`if (existsSync(candidate)) {

@@ -27,6 +27,9 @@ interface PiRunConfig {
 }
 
 interface PiExtensionInternals {
+  buildContext: (root: string, agent: string, key: string | null) => string;
+  readBoundedArtifact: (path: string, displayPath: string) => string;
+  renderManifestIndex: (root: string, taskDir: string, jsonlName: string) => string;
   normalizeAgent: (agent: string | undefined) => string;
   isTrellisAgent: (root: string, agent: string) => boolean;
   parseAgentFM: (content: string) => AgentConfig;
@@ -49,6 +52,9 @@ function loadExtensionInternals(cwd = process.cwd()): PiExtensionInternals {
   const source = `${getExtensionTemplate()}
 
 export {
+  buildContext,
+  readBoundedArtifact,
+  renderManifestIndex,
   normalizeAgent,
   isTrellisAgent,
   parseAgentFM,
@@ -114,6 +120,96 @@ function createMinimalTrellisRoot(): string {
 }
 
 describe("pi templates", () => {
+  it("buildContext renders bounded metadata indexes and UTF-8-safe task artifacts", () => {
+    const root = mkdtempSync(join(tmpdir(), "trellis-pi-bounded-context-"));
+    const task = join(root, ".trellis", "tasks", "bounded-context");
+    mkdirSync(join(root, ".git"), { recursive: true });
+    mkdirSync(join(root, ".trellis", ".runtime", "sessions"), { recursive: true });
+    mkdirSync(join(root, ".trellis", "spec"), { recursive: true });
+    mkdirSync(task, { recursive: true });
+    writeFileSync(
+      join(root, ".trellis", ".runtime", "sessions", "pi_bounded.json"),
+      JSON.stringify({ current_task: ".trellis/tasks/bounded-context" }),
+    );
+    const marker = "PI_REFERENCED_BODY_MARKER";
+    writeFileSync(
+      join(root, ".trellis", "spec", "large.md"),
+      `${marker}\n${"x".repeat(2 * 1024 * 1024)}`,
+    );
+    writeFileSync(
+      join(task, "implement.jsonl"),
+      [
+        JSON.stringify({ file: ".trellis/spec/large.md", reason: "Pi metadata reason" }),
+        JSON.stringify({ path: ".trellis/spec", type: "directory", reason: "Pi directory" }),
+        "{bad",
+      ].join("\n"),
+    );
+    writeFileSync(join(task, "prd.md"), `PRD_START\n${"界".repeat(90_000)}PRD_END`);
+    writeFileSync(join(task, "design.md"), `DESIGN_START\n${"计".repeat(90_000)}`);
+    writeFileSync(join(task, "implement.md"), `PLAN_START\n${"划".repeat(90_000)}`);
+
+    const context = loadExtensionInternals(root).buildContext(
+      root,
+      "trellis-implement",
+      "pi_bounded",
+    );
+
+    expect(Buffer.byteLength(context, "utf8")).toBeLessThanOrEqual(128 * 1024);
+    expect(context).not.toContain(marker);
+    expect(context).toContain(".trellis/spec/large.md");
+    expect(context).toContain("Pi metadata reason");
+    expect(context).toContain("type: file");
+    expect(context).toContain("type: directory");
+    expect(context).not.toContain("PRD_END");
+    expect(context).not.toContain("�");
+    expect(context).toContain("load the remainder on demand");
+    expect(context).toContain(`${task}/design.md`);
+    expect(context).toContain(`${task}/implement.md`);
+  });
+
+  it("enforces Pi artifact, entry, source, and rendered-index limits", () => {
+    const root = mkdtempSync(join(tmpdir(), "trellis-pi-all-limits-"));
+    const task = join(root, ".trellis", "tasks", "limits");
+    mkdirSync(task, { recursive: true });
+    const internals = loadExtensionInternals(root);
+    const artifactPath = join(task, "prd.md");
+    writeFileSync(artifactPath, `START\n${"界".repeat(90_000)}END`);
+    const artifact = internals.readBoundedArtifact(artifactPath, ".trellis/tasks/limits/prd.md");
+    expect(Buffer.byteLength(artifact, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(artifact).toContain("Truncated .trellis/tasks/limits/prd.md at 65536 UTF-8 bytes");
+    expect(artifact).not.toContain("�");
+
+    const manifestPath = join(task, "implement.jsonl");
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 257 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/${index}.md`, reason: `entry ${index}` }),
+      ).join("\n"),
+    );
+    const entryLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(entryLimited.match(/^- path:/gm)).toHaveLength(256);
+    expect(entryLimited).toContain("Omitted additional entries from implement.jsonl after 256");
+
+    writeFileSync(
+      manifestPath,
+      Array.from({ length: 256 }, (_, index) =>
+        JSON.stringify({ file: `.trellis/spec/long-${index}.md`, reason: `${index}-${"r".repeat(500)}` }),
+      ).join("\n"),
+    );
+    const indexLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(Buffer.byteLength(indexLimited, "utf8")).toBeLessThanOrEqual(32 * 1024);
+    expect(indexLimited).toContain("Truncated rendered index for implement.jsonl");
+    expect(indexLimited).not.toContain("�");
+
+    writeFileSync(
+      manifestPath,
+      `${JSON.stringify({ file: ".trellis/spec/first.md", reason: "first" })}\n${"x".repeat(300 * 1024)}`,
+    );
+    const sourceLimited = internals.renderManifestIndex(root, task, "implement.jsonl");
+    expect(sourceLimited).toContain("path: .trellis/spec/first.md");
+    expect(sourceLimited).toContain("Stopped reading implement.jsonl after 262144 bytes");
+  });
+
   it("provides the three Trellis sub-agent definitions", () => {
     const agents = getAllAgents();
     expect(agents.map((agent) => agent.name).sort()).toEqual([
