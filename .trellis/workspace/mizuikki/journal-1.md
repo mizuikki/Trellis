@@ -42,3 +42,38 @@ Replaced eager manifest body injection with bounded metadata indexes across shar
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Harden bounded context Unicode and deduplication
+
+**Date**: 2026-07-21
+**Task**: Harden bounded context Unicode and deduplication
+**Package**: cli
+**Branch**: `fix/unbounded-subagent-context-injection`
+
+### Summary
+
+Hardened bounded sub-agent context across shared Python, Pi, OMP, and OpenCode with Unicode-safe reasons, rendered UTF-8 artifact limits, canonical-target deduplication, structured truncation state, synchronized dogfood copies, and regression coverage; all Core and CLI tests passed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6eafd308` | (see git log) |
+| `5187fbfd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
