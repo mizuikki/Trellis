@@ -90,6 +90,16 @@ const MAX_REASON_CHARS = 240;
 const ABORT_KILL_GRACE_MS = 1500;
 const SESSION_OVERVIEW_TIMEOUT_MS = 1500;
 const THROTTLE_MS = 500;
+const FIRST_REPLY_NOTICE = `<first-reply-notice>
+On the first visible assistant reply in this session, briefly acknowledge that Trellis SessionStart context loaded.
+Choose the acknowledgment language in this order:
+1. Use the language of the user's current request (the user message that triggered this reply).
+2. If that request has no clear natural language, use an explicitly established project communication language.
+3. If neither provides a language, output the language-neutral fallback exactly: \`Trellis SessionStart ✓\`.
+Continue directly with the user's request after the acknowledgment.
+The acknowledgment must not alter the language used for the remainder of the response.
+This notice is one-shot: do not repeat it after the first visible assistant reply in this session.
+</first-reply-notice>`;
 
 // ── State types ───────────────────────────────────────────────────────
 type RunStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
@@ -477,7 +487,12 @@ function isInsideRoot(root: string, candidate: string): boolean {
 function resolveManifestPath(root: string, rawPath: string): { path: string; target: string } | null {
   const normalized = rawPath.trim().replace(/\\/g, "/");
   if (!normalized || isAbsolute(normalized) || /^[A-Za-z]:\//.test(normalized)) return null;
-  const rootPath = resolve(root);
+  // Canonicalize the project root so symlink workspaces compare equal to
+  // realpath-resolved entry targets (OpenCode/OMP already do this).
+  let rootPath = resolve(root);
+  try {
+    rootPath = resolve(realpathSync(root));
+  } catch {}
   const candidate = resolve(rootPath, normalized);
   if (!isInsideRoot(rootPath, candidate)) return null;
   let target = candidate;
@@ -1030,12 +1045,12 @@ function workflowBreadcrumb(root: string, key: string | null): string {
 }
 
 // ── Session Overview ───────────────────────────────────────────────────
-function sessionOverview(root: string, key: string | null): string {
+function runContextScript(root: string, key: string | null, args: string[]): string {
   const script = join(root, ".trellis", "scripts", "get_context.py");
   if (!exists(script)) return "";
   try {
     const py = process.platform === "win32" ? "python" : "python3";
-    const result = spawnSync(py, [script], {
+    const result = spawnSync(py, [script, ...args], {
       cwd: root,
       env: key ? { ...process.env, TRELLIS_CONTEXT_ID: key } : process.env,
       encoding: "utf-8",
@@ -1044,10 +1059,42 @@ function sessionOverview(root: string, key: string | null): string {
     });
     if (result.status !== 0) return "";
     const stdout = (result.stdout ?? "").trim();
-    return stdout ? `<session-overview>\n${stdout}\n</session-overview>` : "";
+    return stdout;
   } catch {
     return "";
   }
+}
+
+function sessionOverview(root: string, key: string | null): string {
+  const stdout = runContextScript(root, key, []);
+  return stdout ? `<session-overview>\n${stdout}\n</session-overview>` : "";
+}
+
+function workflowOverview(root: string, key: string | null): string {
+  const stdout = runContextScript(root, key, [
+    "--mode",
+    "phase",
+    "--platform",
+    "pi",
+  ]);
+  return stdout ? `<trellis-workflow>\n${stdout}\n</trellis-workflow>` : "";
+}
+
+function buildStartupContext(
+  root: string,
+  key: string | null,
+  overview: string,
+): string {
+  const workflow = workflowOverview(root, key);
+  return [
+    "<session-context>\nTrellis compact SessionStart context. Use it to orient the session; load details on demand.\n</session-context>",
+    FIRST_REPLY_NOTICE,
+    overview,
+    workflow,
+    "<ready>\nUse the current workflow state to decide whether to create, continue, or skip a Trellis task.\n</ready>",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function buildContext(root: string, agent: string, key: string | null): string {
@@ -1531,6 +1578,26 @@ export default function trellisExtension(pi: {
     };
     return turnCache;
   };
+  // Provider prefix caches invalidate from byte 0 whenever the system prompt
+  // changes, so everything injected into systemPrompt is memoized per context
+  // key and stays byte-identical for the life of the process. Volatile state
+  // travels through persisted custom messages instead (append-only history).
+  const startupCtxCache = new Map<string, string>();
+  const getStartupCtx = (
+    k: string | null,
+    turn: { ov: string },
+  ): string => {
+    const key = k ?? "default";
+    let startup = startupCtxCache.get(key);
+    if (startup === undefined) {
+      startup = buildStartupContext(root, k, turn.ov);
+      startupCtxCache.set(key, startup);
+    }
+    return startup;
+  };
+  const taskCtxSnapshot = new Map<string, string>();
+  const lastSentTaskCtx = new Map<string, string>();
+  const lastSentRuntimeCtx = new Map<string, string>();
 
   // Toggle only the latest subagent native card; do not use Pi global tool expansion.
   const toggleDetail = (ctx: PiExtensionContext) => {
@@ -1709,7 +1776,7 @@ export default function trellisExtension(pi: {
   pi.on?.("session_start", (event, ctx) => {
     getKey(event, ctx);
     ctx?.ui?.notify?.(
-      "Trellis project context is available. Use /trellis-continue to resume the current task.",
+      "Trellis project context is available. Use /trellis-start to bootstrap or /trellis-continue to resume.",
       "info",
     );
   });
@@ -1746,11 +1813,43 @@ export default function trellisExtension(pi: {
   });
   pi.on?.("before_agent_start", (event, ctx) => {
     const k = getKey(event, ctx);
+    const key = k ?? "default";
     const cur = (event as { systemPrompt?: string }).systemPrompt ?? "";
-    const ctxText = buildContext(root, "trellis-implement", k);
-    const { wf, ov } = getTurnCtx(k);
+    const turn = getTurnCtx(k);
+    const startup = getStartupCtx(k, turn);
+    // Task context is snapshotted into systemPrompt once; later on-disk
+    // changes are delivered as persisted messages so the prefix stays stable.
+    const freshTaskCtx = buildContext(root, "trellis-implement", k);
+    let taskCtx = taskCtxSnapshot.get(key);
+    if (taskCtx === undefined) {
+      taskCtx = freshTaskCtx;
+      taskCtxSnapshot.set(key, taskCtx);
+      lastSentTaskCtx.set(key, freshTaskCtx);
+    }
+    const updates: string[] = [];
+    const runtimeContext = [turn.wf, turn.ov].filter(Boolean).join("\n\n");
+    if (runtimeContext && runtimeContext !== lastSentRuntimeCtx.get(key)) {
+      lastSentRuntimeCtx.set(key, runtimeContext);
+      updates.push(runtimeContext);
+    }
+    if (freshTaskCtx !== lastSentTaskCtx.get(key)) {
+      lastSentTaskCtx.set(key, freshTaskCtx);
+      updates.push(
+        "<trellis-task-context-update>\nTask context changed on disk. This supersedes the Trellis Task Context in the system prompt.\n\n" +
+          freshTaskCtx +
+          "\n</trellis-task-context-update>",
+      );
+    }
+    const content = updates.join("\n\n");
     return {
-      systemPrompt: [cur, ctxText, wf, ov].filter(Boolean).join("\n\n"),
+      message: content
+        ? {
+            customType: "trellis-runtime-context",
+            content,
+            display: false,
+          }
+        : undefined,
+      systemPrompt: [cur, startup, taskCtx].filter(Boolean).join("\n\n"),
     };
   });
   pi.on?.("context", (event, ctx) => {

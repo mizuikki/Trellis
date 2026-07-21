@@ -48,7 +48,7 @@ function buildContextKey(platformName: string, kind: string, value: string): str
    return safeValue ? `${platformName}_${safeValue}` : `${platformName}_${hashValue(value)}`;
 }
 
-function deriveContextKey(ctx?: { sessionManager?: { getSessionId?: () => string; getSessionFile?: () => string } }): string | null {
+function deriveContextKey(ctx?: { sessionManager?: { getSessionId?: () => string | undefined; getSessionFile?: () => string | undefined } }): string | null {
    const sessionId = ctx?.sessionManager?.getSessionId?.();
    if (sessionId) {
       return buildContextKey("omp", "session", sessionId);
@@ -91,7 +91,9 @@ function readLimitedBytes(path: string, limit: number): Buffer | null {
    } catch {
       return null;
    } finally {
-      if (fd !== null) { try { closeSync(fd); } catch { } }
+      if (fd !== null) {
+         try { closeSync(fd); } catch { }
+      }
    }
 }
 
@@ -150,11 +152,21 @@ function renderManifestIndex(projectRoot: string, taskDir: string, jsonlName: st
    const sourceBytes = readLimitedBytes(join(taskDir, jsonlName), MAX_MANIFEST_SOURCE_BYTES);
    if (!sourceBytes) return "";
    const sourceTruncated = sourceBytes.length > MAX_MANIFEST_SOURCE_BYTES;
-   let source = new StringDecoder("utf8").write(sourceBytes.subarray(0, MAX_MANIFEST_SOURCE_BYTES));
+   let source = new StringDecoder("utf8").write(
+      sourceBytes.subarray(0, MAX_MANIFEST_SOURCE_BYTES),
+   );
    if (sourceTruncated) {
       const lastNewline = source.lastIndexOf("\n");
       source = lastNewline >= 0 ? source.slice(0, lastNewline) : "";
    }
+
+   // Match resolveProjectFile: display paths must be relative to the realpath root
+   // so symlink workspaces do not emit ../-style non-repo paths.
+   let rootReal = resolve(projectRoot);
+   try {
+      rootReal = realpathSync(projectRoot);
+   } catch {}
+
    const rows: string[] = [];
    const seen = new Set<string>();
    let entryLimitReached = false;
@@ -163,37 +175,58 @@ function renderManifestIndex(projectRoot: string, taskDir: string, jsonlName: st
       if (!trimmed) continue;
       try {
          const row = JSON.parse(trimmed) as Record<string, unknown>;
-         const rawPath = typeof row.file === "string" ? row.file.trim() : typeof row.path === "string" ? row.path.trim() : "";
+         const rawPath = typeof row.file === "string"
+            ? row.file.trim()
+            : typeof row.path === "string"
+               ? row.path.trim()
+               : "";
          if (!rawPath) continue;
          const entryType = row.type === "directory" ? "directory" : "file";
          const targetPath = resolveProjectFile(projectRoot, rawPath);
          if (!targetPath) continue;
          // Display + dedup use the realpath-resolved repository-relative target so
          // symlink aliases of one file collapse to a single canonical row.
-         const displayPath = relative(resolve(projectRoot), targetPath).replace(/\\/g, "/");
+         const displayPath = relative(rootReal, targetPath).replace(/\\/g, "/");
          const key = displayPath;
          if (seen.has(key)) continue;
-         if (rows.length >= MAX_MANIFEST_ENTRIES) { entryLimitReached = true; break; }
+         if (rows.length >= MAX_MANIFEST_ENTRIES) {
+            entryLimitReached = true;
+            break;
+         }
          seen.add(key);
          const fields = [`path: ${displayPath}`, `type: ${entryType}`];
          try {
             const metadata = statSync(targetPath);
             if (entryType === "file") fields.push(`bytes: ${metadata.size}`);
             fields.push(`revision: ${metadata.mtimeMs}`);
-         } catch { fields.push("status: missing-or-unreadable"); }
+         } catch {
+            fields.push("status: missing-or-unreadable");
+         }
          fields.push(`reason: ${normalizeReason(row.reason)}`);
          rows.push(`- ${fields.join(" | ")}`);
-      } catch { }
+      } catch {
+         // Seed rows and malformed lines are non-fatal.
+      }
    }
    if (rows.length === 0 && !sourceTruncated) return "";
    const lines = [`## ${jsonlName} candidate context index (load sources on demand)`, ...rows];
    const limitNotices: string[] = [];
-   if (entryLimitReached) limitNotices.push(`[Omitted additional entries from ${jsonlName} after ${MAX_MANIFEST_ENTRIES}; load the manifest on demand.]`);
-   if (sourceTruncated) limitNotices.push(`[Stopped reading ${jsonlName} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`);
+   if (entryLimitReached) {
+      limitNotices.push(`[Omitted additional entries from ${jsonlName} after ${MAX_MANIFEST_ENTRIES}; load the manifest on demand.]`);
+   }
+   if (sourceTruncated) {
+      limitNotices.push(`[Stopped reading ${jsonlName} after ${MAX_MANIFEST_SOURCE_BYTES} bytes; load the remainder on demand.]`);
+   }
    const rendered = lines.join("\n");
    const combined = [rendered, ...limitNotices].join("\n");
-   if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) return combined;
-   return truncateUtf8(combined, MAX_MANIFEST_INDEX_BYTES, [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "));
+   if (Buffer.byteLength(combined, "utf8") <= MAX_MANIFEST_INDEX_BYTES) {
+      return combined;
+   }
+   return truncateUtf8(
+      combined,
+      MAX_MANIFEST_INDEX_BYTES,
+      [`[Truncated rendered index for ${jsonlName}; load the manifest on demand.]`, ...limitNotices].join(" "),
+   );
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +325,7 @@ function buildSessionContext(projectRoot: string, contextKey: string | null): st
 }
 
 // ---------------------------------------------------------------------------
-// Task context — prd.md, info.md, and jsonl-referenced spec/research files
+// Task context — bounded task artifacts and metadata-only manifest indexes
 // ---------------------------------------------------------------------------
 
 type AgentType = "trellis-implement" | "trellis-check" | "trellis-research" | null;
@@ -332,7 +365,11 @@ function buildTaskContext(projectRoot: string, taskDir: string, agentType?: Agen
    }
 
    const context = `<task-context>\n${parts.join("\n\n")}\n</task-context>`;
-   return truncateUtf8(context, MAX_TASK_CONTEXT_BYTES, `[Task context for ${displayTaskDir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`);
+   return truncateUtf8(
+      context,
+      MAX_TASK_CONTEXT_BYTES,
+      `[Task context for ${displayTaskDir} exceeded ${MAX_TASK_CONTEXT_BYTES} bytes; artifact limits applied to ${truncatedArtifacts.join(", ") || "none"}; load the remaining task artifacts and manifest sources on demand.]`,
+   );
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +474,7 @@ export default function(pi: ExtensionAPI): void {
    let lastCompactionTs = 0;
    let lastInjectionTs = 0;
 
-   const rememberContextKey = (ctx?: { sessionManager?: { getSessionId?: () => string; getSessionFile?: () => string } }): string | null => {
+   const rememberContextKey = (ctx?: { sessionManager?: { getSessionId?: () => string | undefined; getSessionFile?: () => string | undefined } }): string | null => {
       const key = deriveContextKey(ctx);
       if (!key) return null;
       return key;
@@ -540,12 +577,27 @@ export default function(pi: ExtensionAPI): void {
          messages: [
             ...event.messages,
             {
-               role: "custom",
+               role: "custom" as const,
                customType: "trellis-workflow-state",
                content: cached.workflowMsg,
+               display: false,
                timestamp: Date.now(),
             },
          ],
+      };
+   });
+
+   // OMP passes Bash event.input through to the tool execution parameters, so
+   // inject the session key through the shell-agnostic env field. An explicit
+   // per-call value wins over the derived key.
+   pi.on("tool_call", (event, ctx) => {
+      if (event.toolName !== "bash") return;
+      const contextKey = rememberContextKey(ctx);
+      if (!contextKey) return;
+      const input = event.input as { env?: Record<string, string> };
+      input.env = {
+         TRELLIS_CONTEXT_ID: contextKey,
+         ...input.env,
       };
    });
 
@@ -554,10 +606,9 @@ export default function(pi: ExtensionAPI): void {
          projectRoot = findProjectRoot(ctx.cwd);
       }
       // Resolve projectRoot on first input if session_start missed it
-      if (!projectRoot) return { action: "continue" };
+      if (!projectRoot) return;
       const contextKey = rememberContextKey(ctx);
       // Pre-warm the cache so before_agent_start and context can use it
       turnCache.get(projectRoot, contextKey);
-      return { action: "continue" };
    });
 }
