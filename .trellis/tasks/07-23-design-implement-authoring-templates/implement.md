@@ -6,67 +6,67 @@
 
 ### Phase 0 — Lock contract
 
-- [ ] 0.1 Adopt Core/Triggered/Optional authoring semantics with same-repository vendored Marketplace ownership; create does not seed design/implement.
-- [ ] 0.2 Semantic IDs (`D-BOUND` … `I-EXIT`) are **product-internal vocabulary and test labels only** — not runtime schema; not required permanently in user task files.
-- [ ] 0.3 Product CLI is only `task.py scaffold <task> design|implement|all`. **No** `create --complex`.
-- [ ] 0.4 Dual-layer: `task.py start` is the machine state-transition hard gate for every present design/implement artifact; SessionStart provides matching deterministic diagnostics; agent/workflow guidance classifies lightweight vs complex and applies artifact/jsonl requirements. Runtime does not infer complexity or parse Semantic IDs, headings, or prose.
-- [ ] 0.5 Exact lifecycle token is `<!-- trellis:scaffold-unfilled -->`; every canonical scaffold contains it exactly once and `task.py start` rejects it.
-- [ ] 0.6 Scaffold writes only to a validated non-symlink live direct child of `.trellis/tasks/` containing non-symlink regular UTF-8/parseable object `task.json` with non-empty string `title`; reject malformed metadata and archive/outside/nested/symlink escapes before writes.
-- [ ] 0.7 Never overwrite existing paths; regular files (including empty) are `skipped_exists`, non-regular types are hard errors; exclusive create; deterministic per-target results and final exit code for `all`.
-- [ ] 0.8 `common/task_artifacts.py` is the only scaffold-body source and owns the artifact lifecycle; brainstorm invokes the CLI and contains rubric only.
-- [ ] 0.9 Product surface English-only; no Chinese section catalogs in shipped scaffold/guidance.
-- [ ] 0.10 jsonl curated semantics unchanged; D-RISK/I-ROLL and D-TEST/I-VAL split per design §3.8.
-- [ ] 0.11 I-LOG / I-MULTI stay out of global default skeleton; triggered D-FLOW/D-CONTRACT cannot be omitted when applicable.
+- [x] 0.1 Adopt Core/Triggered/Optional authoring semantics with same-repository vendored Marketplace ownership; create does not seed design/implement.
+- [x] 0.2 Semantic IDs (`D-BOUND` … `I-EXIT`) are **product-internal vocabulary and test labels only** — not runtime schema; not required permanently in user task files.
+- [x] 0.3 Product CLI is only `task.py scaffold <task> design|implement|all`. **No** `create --complex`.
+- [x] 0.4 Dual-layer: `task.py start` is the machine state-transition hard gate for every present design/implement artifact; SessionStart provides matching deterministic diagnostics; agent/workflow guidance classifies lightweight vs complex and applies artifact/jsonl requirements. Runtime does not infer complexity or parse Semantic IDs, headings, or prose.
+- [x] 0.5 Exact lifecycle token is `<!-- trellis:scaffold-unfilled -->`; every canonical scaffold contains it exactly once and `task.py start` rejects it.
+- [x] 0.6 Scaffold writes only to a validated non-symlink live direct child of `.trellis/tasks/` containing non-symlink regular UTF-8/parseable object `task.json` with non-empty string `title`; reject malformed metadata and archive/outside/nested/symlink escapes before writes.
+- [x] 0.7 Never overwrite existing paths; regular files (including empty) are `skipped_exists`, non-regular types are hard errors; exclusive create; deterministic per-target results and final exit code for `all`.
+- [x] 0.8 `common/task_artifacts.py` is the only scaffold-body source and owns the artifact lifecycle; brainstorm invokes the CLI and contains rubric only.
+- [x] 0.9 Product surface English-only; no Chinese section catalogs in shipped scaffold/guidance.
+- [x] 0.10 jsonl curated semantics unchanged; D-RISK/I-ROLL and D-TEST/I-VAL split per design §3.8.
+- [x] 0.11 I-LOG / I-MULTI stay out of global default skeleton; triggered D-FLOW/D-CONTRACT cannot be omitted when applicable.
 - [x] 0.12 Marketplace-merge prerequisite completed in `d01aee69`: normal tracked `marketplace/`, provenance pinned to upstream `758398b89e159f4b6658383dd26c484da423ba93`, fork-owned registry URLs, no Marketplace submodule entry, and no release exclusion.
-- [ ] 0.13 Use a dedicated typed `common/task_artifacts.py` deep module instead of expanding the existing 882-line `task_store.py`; keep `task_store.py` responsible for task CRUD and default `prd.md` only.
-- [ ] 0.14 Shipped command guidance uses `{{PYTHON_CMD}}`; concurrency guarantees cover exclusive target-file creation under a stable parent-directory assumption, with task-directory revalidation before each target create.
+- [x] 0.13 Use a dedicated typed `common/task_artifacts.py` deep module instead of expanding the existing 882-line `task_store.py`; keep `task_store.py` responsible for task CRUD and default `prd.md` only.
+- [x] 0.14 Shipped command guidance uses `{{PYTHON_CMD}}`; concurrency guarantees cover exclusive target-file creation under a stable parent-directory assumption, with task-directory revalidation before each target create.
 
 ### Phase 1 — Helper and CLI (MVP)
 
-- [ ] 1.1 Add `common/task_artifacts.py` with typed `ArtifactKind`, readiness/result records, and `_default_design_content` / `_default_implement_content` as the only canonical scaffold-body definitions; each body emits the exact sentinel once plus optional ID comments.
-- [ ] 1.2 Implement `cmd_scaffold` through the artifact module: `scaffold <task> design|implement|all`; keep `task.py` as parser/dispatch.
-- [ ] 1.3 Add the scaffold-specific live-task resolver to `task_artifacts.py`: exact direct-child name first, then collect a unique suffix match (never first-match wins), or resolve a supplied path; require the safe boundary plus valid task metadata/title contract without changing the legacy resolver semantics used by other commands.
-- [ ] 1.4 Snapshot and revalidate the same non-symlink resolved task directory before each target operation, then exclusive-create the target in one operation; existing regular file (including empty) → `skipped_exists`; directory/symlink/other non-regular type → `error_invalid_target`; never truncate, follow, or replace. Document the stable-parent-directory assumption for the final syscall window.
-- [ ] 1.5 After task validation, print one filename result per target; successes to stdout, errors to stderr. `all` processes `design.md` then `implement.md` and attempts both even after a first-target error. Return 0 iff all results are `created|skipped_exists`, 1 for task/per-target failures, and argparse's 2 for syntax errors.
-- [ ] 1.6 Add reusable artifact-readiness detection to `task_artifacts.py`: any present design/implement path must be non-symlink regular, UTF-8 readable, non-whitespace, and free of the exact standalone sentinel in its first five physical lines; no whole-body search, body hash, heading check, or Semantic-ID parsing.
-- [ ] 1.7 Register `task.py` usage/import/parser/dispatch/help; skeleton is a prompt, sentinel must remain until Core review passes.
-- [ ] 1.8 Update `cmd_start` to reject any present invalid/empty/sentinel-bearing `design.md` / `implement.md` before status, hook, or active-pointer mutation.
-- [ ] 1.9 Do **not** implement `create --complex`.
+- [x] 1.1 Add `common/task_artifacts.py` with typed `ArtifactKind`, readiness/result records, and `_default_design_content` / `_default_implement_content` as the only canonical scaffold-body definitions; each body emits the exact sentinel once plus optional ID comments.
+- [x] 1.2 Implement `cmd_scaffold` through the artifact module: `scaffold <task> design|implement|all`; keep `task.py` as parser/dispatch.
+- [x] 1.3 Add the scaffold-specific live-task resolver to `task_artifacts.py`: exact direct-child name first, then collect a unique suffix match (never first-match wins), or resolve a supplied path; require the safe boundary plus valid task metadata/title contract without changing the legacy resolver semantics used by other commands.
+- [x] 1.4 Snapshot and revalidate the same non-symlink resolved task directory before each target operation, then exclusive-create the target in one operation; existing regular file (including empty) → `skipped_exists`; directory/symlink/other non-regular type → `error_invalid_target`; never truncate, follow, or replace. Document the stable-parent-directory assumption for the final syscall window.
+- [x] 1.5 After task validation, print one filename result per target; successes to stdout, errors to stderr. `all` processes `design.md` then `implement.md` and attempts both even after a first-target error. Return 0 iff all results are `created|skipped_exists`, 1 for task/per-target failures, and argparse's 2 for syntax errors.
+- [x] 1.6 Add reusable artifact-readiness detection to `task_artifacts.py`: any present design/implement path must be non-symlink regular, UTF-8 readable, non-whitespace, and free of the exact standalone sentinel in its first five physical lines; no whole-body search, body hash, heading check, or Semantic-ID parsing.
+- [x] 1.7 Register `task.py` usage/import/parser/dispatch/help; skeleton is a prompt, sentinel must remain until Core review passes.
+- [x] 1.8 Update `cmd_start` to reject any present invalid/empty/sentinel-bearing `design.md` / `implement.md` before status, hook, or active-pointer mutation.
+- [x] 1.9 Do **not** implement `create --complex`.
 
 ### Phase 2 — Skill, workflow, and dual-layer wording
 
-- [ ] 2.1 brainstorm (all exact consumers/mirrors in matrix): Core/Triggered/Optional tables, anti-fill, archetype tips, D/I boundaries, UI DESIGN.md ≠ tech design.md; invoke `{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all` for missing complex artifacts rather than embedding/writing duplicate skeleton bytes.
-- [ ] 2.2 Authoring rubric: reject invalid/empty/header-sentinel artifacts as planning-ready; remove each sentinel only after that artifact's Core/triggered semantics pass review; no H2-name lint.
-- [ ] 2.3 workflow.md: lightweight vs complex; dual-layer readiness wording; jsonl ≠ implement; short; English.
-- [ ] 2.4 Shared/Codex/Copilot session-start, OpenCode session-utils, continue/start guidance, and tracked dogfood outputs: detect invalid/empty/header-sentinel artifacts and route to “scaffold/artifact present but not ready; fill and review Core”; never call them complete.
-- [ ] 2.5 Apply the exact **Source → consumer → tracked output** matrix below; Marketplace workflow changes are committed in this repository.
+- [x] 2.1 brainstorm (all exact consumers/mirrors in matrix): Core/Triggered/Optional tables, anti-fill, archetype tips, D/I boundaries, UI DESIGN.md ≠ tech design.md; invoke `{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all` for missing complex artifacts rather than embedding/writing duplicate skeleton bytes.
+- [x] 2.2 Authoring rubric: reject invalid/empty/header-sentinel artifacts as planning-ready; remove each sentinel only after that artifact's Core/triggered semantics pass review; no H2-name lint.
+- [x] 2.3 workflow.md: lightweight vs complex; dual-layer readiness wording; jsonl ≠ implement; short; English.
+- [x] 2.4 Shared/Codex/Copilot session-start, OpenCode session-utils, continue/start guidance, and tracked dogfood outputs: detect invalid/empty/header-sentinel artifacts and route to “scaffold/artifact present but not ready; fill and review Core”; never call them complete.
+- [x] 2.5 Apply the exact **Source → consumer → tracked output** matrix below; Marketplace workflow changes are committed in this repository.
 
 ### Phase 3 — Tests
 
-- [ ] 3.1 create → no design/implement.
-- [ ] 3.2 scaffold with explicit task → English skeleton + exact stdout result; second call reports `skipped_exists`; original bytes unchanged.
-- [ ] 3.3 missing CLI argument → exit 2; unknown/ambiguous/invalid-boundary/malformed-task-json/missing-title task → exit 1 + stderr; no target writes.
-- [ ] 3.4 `all` with one file present, one missing → creates missing only; reports both.
-- [ ] 3.5 existing **empty** file is not overwritten.
-- [ ] 3.6 existing directory/symlink/other non-regular target is not followed/replaced and returns `error_invalid_target`; outside/archive/nested/symlink-escape task paths fail before writes.
-- [ ] 3.7 concurrent/exclusive create: no silent clobber; loser reports `skipped_exists` only for a resulting regular file, otherwise `error_invalid_target`.
-- [ ] 3.8 `all` continues after one per-target hard error, emits one result for both targets on the defined stream, and returns 1.
-- [ ] 3.9 canonical bodies contain the sentinel exactly once below the title; `task.py start` rejects invalid/empty/header-sentinel artifacts without status/hook/pointer mutation, ignores later literal mentions, and succeeds for filled regular files after header-marker removal.
-- [ ] 3.10 shared/Codex/Copilot/OpenCode SessionStart plus continue guidance report artifact-pending for invalid/empty/header-sentinel states and never report them complete.
-- [ ] 3.11 Semantic-ID parity across rubric consumers; no complete scaffold-body duplicate in brainstorm sources.
-- [ ] 3.12 Scoped check: **new** scaffold constants + guidance blocks only — no Chinese section catalog (not whole-repo vague grep).
-- [ ] 3.13 no fixed-H2-set assertions; no permanent user-doc ID requirement tests.
-- [ ] 3.14 package test / typecheck / lint + **`pnpm --filter @mindfoldhq/trellis lint:py`**.
-- [ ] 3.15 regression still covers brainstorm triple + workflow jsonl gates where applicable.
-- [ ] 3.16 configurator/render tests prove scaffold commands become `python` on Windows and `python3` elsewhere; no shipped `python3` literal is introduced in placeholder-capable guidance.
-- [ ] 3.17 parent-directory revalidation is covered independently from target-file create races; tests do not claim portable protection against an adversarial replacement in the final syscall window.
+- [x] 3.1 create → no design/implement.
+- [x] 3.2 scaffold with explicit task → English skeleton + exact stdout result; second call reports `skipped_exists`; original bytes unchanged.
+- [x] 3.3 missing CLI argument → exit 2; unknown/ambiguous/invalid-boundary/malformed-task-json/missing-title task → exit 1 + stderr; no target writes.
+- [x] 3.4 `all` with one file present, one missing → creates missing only; reports both.
+- [x] 3.5 existing **empty** file is not overwritten.
+- [x] 3.6 existing directory/symlink/other non-regular target is not followed/replaced and returns `error_invalid_target`; outside/archive/nested/symlink-escape task paths fail before writes.
+- [x] 3.7 concurrent/exclusive create: no silent clobber; loser reports `skipped_exists` only for a resulting regular file, otherwise `error_invalid_target`.
+- [x] 3.8 `all` continues after one per-target hard error, emits one result for both targets on the defined stream, and returns 1.
+- [x] 3.9 canonical bodies contain the sentinel exactly once below the title; `task.py start` rejects invalid/empty/header-sentinel artifacts without status/hook/pointer mutation, ignores later literal mentions, and succeeds for filled regular files after header-marker removal.
+- [x] 3.10 shared/Codex/Copilot/OpenCode SessionStart plus continue guidance report artifact-pending for invalid/empty/header-sentinel states and never report them complete.
+- [x] 3.11 Semantic-ID parity across rubric consumers; no complete scaffold-body duplicate in brainstorm sources.
+- [x] 3.12 Scoped check: **new** scaffold constants + guidance blocks only — no Chinese section catalog (not whole-repo vague grep).
+- [x] 3.13 no fixed-H2-set assertions; no permanent user-doc ID requirement tests.
+- [x] 3.14 package test / typecheck / lint + **`pnpm --filter @mindfoldhq/trellis lint:py`**.
+- [x] 3.15 regression still covers brainstorm triple + workflow jsonl gates where applicable.
+- [x] 3.16 configurator/render tests prove scaffold commands become `python` on Windows and `python3` elsewhere; no shipped `python3` literal is introduced in placeholder-capable guidance.
+- [x] 3.17 parent-directory revalidation is covered independently from target-file create races; tests do not claim portable protection against an adversarial replacement in the final syscall window.
 
 ### Phase 4 — Spec and wrap-up
 
-- [ ] 4.1 Update exact `.trellis/spec` paths in the matrix: task artifact semantics, mandatory sentinel/start gate, safe scaffold writes, public CLI signature, and workflow-state wording/status-writer behavior.
-- [ ] 4.2 Update the exact trellis-meta `task-system.md` and `change-workflow.md` source/dogfood paths in the matrix.
-- [ ] 4.3 Manual smoke: lightweight create; safe scaffold; start blocked by sentinel; fill/review Core; remove sentinel; empty Optional deleted; start succeeds.
-- [ ] 4.4 Confirm Marketplace workflow files are normal main-repository changes, not a dirty submodule or pointer update.
+- [x] 4.1 Update exact `.trellis/spec` paths in the matrix: task artifact semantics, mandatory sentinel/start gate, safe scaffold writes, public CLI signature, and workflow-state wording/status-writer behavior.
+- [x] 4.2 Update the exact trellis-meta `task-system.md` and `change-workflow.md` source/dogfood paths in the matrix.
+- [x] 4.3 Manual smoke: lightweight create; safe scaffold; start blocked by sentinel; fill/review Core; remove sentinel; empty Optional deleted; start succeeds.
+- [x] 4.4 Confirm Marketplace workflow files are normal main-repository changes, not a dirty submodule or pointer update.
 - [ ] 4.5 Formal product task: check → commit (this `tmp/` set is not the product ship).
 
 ## Completed prerequisite evidence

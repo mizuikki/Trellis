@@ -44,7 +44,8 @@ Before writing backend code, read the relevant guidelines based on your task:
 - Logging → [logging-guidelines.md](./logging-guidelines.md)
 - Adding a platform → [platform-integration.md](./platform-integration.md)
 - Modifying `init.ts` flow (new triggers, dispatch branches, bootstrap/joiner) → [platform-integration.md "Bootstrap & Joiner Task Auto-Generation"](./platform-integration.md) — two-point wiring + `.developer` signal
-- Script work → [script-conventions.md](./script-conventions.md)
+- Script work (including `task.py scaffold`, optional planning artifact start
+  gates, or the canonical scaffold module) → [script-conventions.md](./script-conventions.md)
 - Migration system → [migrations.md](./migrations.md)
 - Writing/deleting/moving/overwriting files in a user repo (any `writeFileSync`, `rmSync`, `renameSync`, `shutil.move`, or user/agent-supplied path segment) → [filesystem-safety.md](./filesystem-safety.md)
 - Cutting a release / manifest continuity / npm publishing → [release-process.md](./release-process.md)

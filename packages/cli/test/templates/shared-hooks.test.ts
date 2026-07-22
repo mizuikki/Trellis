@@ -213,7 +213,9 @@ describe("shared-hooks capability table", () => {
     expect(content).toContain("Task context order");
     expect(content).toContain("jsonl entries -> `prd.md`");
     expect(content).toContain("Lightweight task can request start review with PRD-only");
-    expect(content).toContain("complex task must add");
+    expect(content).toContain("Artifact present but not ready");
+    expect(content).toContain("scaffold unfilled");
+    expect(content).toContain("complex task must scaffold and fill");
     expect(content).not.toContain("Status: READY");
     expect(content).not.toContain("<workflow>");
   });

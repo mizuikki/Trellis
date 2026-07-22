@@ -18,6 +18,7 @@ breadcrumbs remain available as a per-turn complement.
 from __future__ import annotations
 
 import sys
+import stat
 
 # Force UTF-8 on stdin/stdout/stderr on Windows. Default codepage there is
 # cp936 / cp1252 / etc. — non-ASCII content (Chinese task names, prd snippets)
@@ -147,6 +148,30 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     return False
 
 
+_SCAFFOLD_SENTINEL = "<!-- trellis:scaffold-unfilled -->"
+
+
+def _planning_artifact_state(path: Path) -> str:
+    """Return missing, ready, or a deterministic pending reason."""
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return "missing"
+    except OSError:
+        return "unreadable"
+    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+        return "invalid path"
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return "unreadable or non-UTF-8"
+    if not content.strip():
+        return "empty"
+    if _SCAFFOLD_SENTINEL in content.splitlines()[:5]:
+        return "scaffold unfilled"
+    return "ready"
+
+
 def read_file(path: Path, fallback: str = "") -> str:
     try:
         return path.read_text(encoding="utf-8")
@@ -261,12 +286,16 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
         )
 
     has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement = (task_dir / "implement.md").is_file()
+    planning_states = {
+        name: _planning_artifact_state(task_dir / name)
+        for name in ("design.md", "implement.md")
+    }
+    has_design = planning_states["design.md"] != "missing"
+    has_implement = planning_states["implement.md"] != "missing"
     present = [
         name
         for name in ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
-        if (task_dir / name).is_file()
+        if planning_states.get(name, "missing") != "missing" or (task_dir / name).is_file()
     ]
     present_line = ", ".join(present) if present else "none"
 
@@ -277,12 +306,22 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
         )
 
     if task_status == "planning":
-        if has_design and has_implement:
-            next_action = "Review planning artifacts with the user before `task.py start`."
+        pending_artifacts = [
+            f"{name} ({state})"
+            for name, state in planning_states.items()
+            if state not in ("missing", "ready")
+        ]
+        if pending_artifacts:
+            next_action = (
+                f"Artifact present but not ready: {', '.join(pending_artifacts)}. "
+                "Fill and review Core and triggered semantics before removing the sentinel."
+            )
+        elif has_design and has_implement:
+            next_action = "Review machine-ready planning artifacts with the user before `task.py start`."
         else:
             next_action = (
                 "Lightweight task can ask for start review with PRD-only; "
-                "complex task must add design.md and implement.md before `task.py start`."
+                "complex task must scaffold and fill design.md and implement.md before `task.py start`."
             )
         return (
             f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"

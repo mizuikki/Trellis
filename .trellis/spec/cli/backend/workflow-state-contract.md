@@ -156,7 +156,7 @@ a new writer requires updating this spec.**
 | # | Writer | File:Line | Value | Trigger |
 |---|--------|-----------|-------|---------|
 | 1 | `cmd_create` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:206` | `"planning"` | `task.py create "<title>"` (also visibly auto-sets the session active-task pointer when session identity is available; `--no-start` skips pointer movement for backlog batching — see R7 in 04-30-workflow-state-commit-gap PRD) |
-| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py:114-115, 128-129` | `"in_progress"` (gated on prior `"planning"`; both branches in `cmd_start`) | `task.py start <dir>` |
+| 2 | `cmd_start` | `packages/cli/src/templates/trellis/scripts/task.py` | `"in_progress"` (gated on prior `"planning"`, and only after optional present planning artifacts pass the readiness gate) | `task.py start <dir>` |
 | 3 | `cmd_archive` | `packages/cli/src/templates/trellis/scripts/common/task_store.py:337` | `"completed"` (unconditional flip + archive `mv`) | `task.py archive <dir>` |
 | 4 | `emptyTaskJson` factory | `packages/cli/src/utils/task-json.ts:54` | `"planning"` (default) | TS callers (init, update) |
 | 5 | `getBootstrapTaskJson` | `packages/cli/src/commands/init.ts:535` | `"in_progress"` (override) | `trellis init` (creator path) |
@@ -166,6 +166,15 @@ a new writer requires updating this spec.**
 **No other writer exists.** No hook script writes `task.json.status` — verified
 by `grep -rn '"status"' .trellis/scripts/`. Linear-sync hook (`linear_sync.py`)
 writes `meta.linear_issue` only.
+
+Before `cmd_start` resolves a context key, writes a session pointer, updates
+`task.json.status`, or invokes `after_start`, it calls
+`check_present_artifacts(full_path)`. Missing `design.md` / `implement.md` is
+allowed. A present non-regular, unreadable, non-UTF-8, empty, or first-five-line
+`<!-- trellis:scaffold-unfilled -->` artifact makes `start` exit 1 with no
+status, pointer, or hook mutation. SessionStart and continue guidance report
+that state as artifact-pending; they do not determine readiness by fixed user
+headings or prose.
 
 ---
 

@@ -26,6 +26,7 @@ All workflow scripts target **Python 3.9+** for cross-platform compatibility (ma
 │   ├── tasks.py          # load_task(), iter_active_tasks() — typed task access
 │   ├── active_task.py    # Session-scoped active task resolver
 │   ├── task_utils.py     # resolve_task_dir(), is_within_tasks_dir(), run_task_hooks()
+│   ├── task_artifacts.py # planning artifact readiness checks + exclusive scaffolding
 │   ├── task_store.py     # Task CRUD (create, archive, set-branch, etc.)
 │   ├── task_context.py   # JSONL context management (add-context, validate, list-context)
 │   ├── task_queue.py     # Task queue CRUD
@@ -384,6 +385,93 @@ from `ctx.sessionManager.getSessionId()` and mutate Bash tool calls in
 `tool_call` by prefixing `export TRELLIS_CONTEXT_ID=<context-key>;`. The Python
 resolver then sees the explicit `TRELLIS_CONTEXT_ID` override; Pi does not need
 a `.current-task` fallback or a Python hook directory.
+
+### `common/task_artifacts.py` — Planning Artifact Lifecycle
+
+Use this module for the optional `design.md` and `implement.md` lifecycle. It
+is the only place that defines the exact scaffold sentinel and the canonical
+scaffold bodies; workflow and authoring guidance explain semantics but must not
+copy those bodies.
+
+#### Scenario: Safe planning artifact scaffolding
+
+##### 1. Scope / Trigger
+
+- Trigger: adding or checking optional planning artifacts before
+  `task.py start`.
+- Reason: a scaffold is a prompt, not completed planning, and an agent-supplied
+  task path must never create files outside a live task directory.
+
+##### 2. Signatures
+
+- `python3 .trellis/scripts/task.py scaffold <task> design|implement|all`
+- `resolve_scaffold_task(task_input, repo_root=None) -> _TaskTarget`
+- `scaffold_artifact(target, kind) -> ScaffoldResult`
+- `check_present_artifacts(task_dir) -> tuple[ArtifactReadiness, ...]`
+
+##### 3. Contracts
+
+- `create` never seeds `design.md` or `implement.md`; callers explicitly run
+  `scaffold` when an artifact is needed.
+- A scaffold target is a non-symlink, direct live child of `.trellis/tasks/`
+  with a non-symlink regular UTF-8 `task.json` object containing a non-empty
+  string `title`. `archive/`, nested, outside, ambiguous, and symlink-escape
+  paths fail before a target write.
+- `design|implement` prints one `<filename>: <code>` result. `all` attempts
+  both in design-then-implement order, including after one per-file error.
+- Creation uses `Path.open("x")`; any existing regular file, including an
+  empty one, is `skipped_exists` and is never overwritten. Existing symlinks,
+  directories, and other non-regular files are `error_invalid_target`.
+- The module snapshots and revalidates the task directory immediately before
+  each create. This narrows parent replacement races but cannot promise
+  protection from an adversarial replacement during the final syscall window.
+- The exact standalone `<!-- trellis:scaffold-unfilled -->` line in the first
+  five lines, an empty file, invalid UTF-8, unreadability, or a non-regular
+  present artifact blocks `start`. Missing artifacts remain allowed.
+
+##### 4. Validation & Error Matrix
+
+| Condition | Result |
+|-----------|--------|
+| Valid task + absent target | `created` |
+| Existing regular target, including empty | `skipped_exists`; bytes unchanged |
+| Existing symlink/directory/device | `error_invalid_target`; never followed or replaced |
+| Invalid task reference or metadata | exit 1 on stderr; no target write |
+| Missing CLI positional argument | argparse usage error, exit 2 |
+| Present artifact is empty, non-UTF-8, non-regular, unreadable, or header-sentinel | `task.py start` exits 1 before pointer, status, or hook mutation |
+
+##### 5. Good / Base / Bad Cases
+
+- Good: `scaffold 07-23-example all` creates English prompt files with the
+  sentinel, the author fills and reviews the needed Core/triggered content,
+  removes the sentinel, then `start` succeeds.
+- Base: a lightweight PRD-only task has no optional artifacts and may start.
+- Bad: treating the presence of a generated scaffold as planning completion,
+  parsing a fixed set of user H2 headings, or overwriting an empty file.
+
+##### 6. Tests Required
+
+- Integration coverage for creation, partial `all`, existing empty/invalid
+  targets, invalid task boundaries, concurrent creation, and parent-directory
+  revalidation.
+- Start-gate coverage that proves a failure leaves status, runtime pointer, and
+  lifecycle hooks untouched, while a filled regular artifact succeeds.
+- Template/guidance tests for the sentinel, Semantic ID parity, and platform
+  `{{PYTHON_CMD}}` rendering.
+
+##### 7. Wrong vs Correct
+
+```python
+# Wrong: truncates an authored or empty artifact and trusts a stale parent path.
+(task_dir / "design.md").write_text(default_design)
+```
+
+```python
+# Correct: validate the live task, revalidate its directory, then create only
+# when the OS confirms the filename did not already exist.
+with path.open("x", encoding="utf-8", newline="\n") as scaffold:
+    scaffold.write(default_design)
+```
 
 #### Scenario: Active Task Runtime Lifecycle
 

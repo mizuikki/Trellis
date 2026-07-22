@@ -65,6 +65,7 @@ delete escapes the store.
 |---|---|---|
 | channel / worker name | `assertSafeName(name, kind)` — `^[A-Za-z0-9._-]+$`, rejects `.`/`..` — called inside `channelDir` (the single chokepoint every path helper passes through) | `core` + `cli` `channel/store/paths.ts` |
 | `task.py archive <name>` target | `is_within_tasks_dir(task_dir_abs, repo_root)` — dir must be a direct child of `.trellis/tasks/` | `scripts/common/task_utils.py` |
+| `task.py scaffold <task> ...` target | `resolve_scaffold_task()` verifies a non-symlink direct live child, resolved boundary, and regular UTF-8 `task.json`; `_TaskTarget` device/inode is revalidated before each `open("x")` | `scripts/common/task_artifacts.py` |
 | rename-dir migration source | `dirHasManifestEntries(fromDir, hashes)` — only auto-move a dir Trellis provably created | `commands/update.ts` |
 
 > **Why the chokepoint, not the entrypoint**: validating inside `channelDir`
@@ -122,6 +123,12 @@ without the guard**:
 - Atomic write: write-succeeds + no tmp leftover + original survives a failed write (`test/utils/atomic-write.test.ts`; Python covered via `task-archive` integration).
 - Path traversal: `create '../../victim' --force` / `rm '../../victim'` throw and the external dir survives — reproduce in a sandbox (`test/channel/name-safety`, `test/commands/channel-name-safety`).
 - Ownership/backup gates: unowned source skipped (`update-internals` rename-dir gate), `archive src` refused with `src/` intact (`task-archive` integration), overwrite-fails-preserves-spec (`template-fetcher-overwrite`), uninstall refuses dirty `--yes` (`uninstall-dirty-guard`, real git).
+- Scaffold safety: outside/archive/nested/symlink-escape task inputs fail before
+  writes; a regular existing target (including empty) is preserved; a
+  symlink/directory target is not followed; concurrent `open("x")` callers
+  cannot silently clobber; and a replaced parent directory fails the explicit
+  revalidation. The final syscall window is documented as a residual race, not
+  claimed as portable adversarial protection.
 
 ---
 

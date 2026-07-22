@@ -3,7 +3,7 @@
   "name": "design-implement-authoring-templates",
   "title": "Implement design.md / implement.md authoring templates",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "cli",

@@ -8,6 +8,7 @@ Usage:
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
+    {{PYTHON_CMD}} task.py scaffold <task> design|implement|all  # Add planning artifact prompts
     python3 task.py start <dir>                 # Set active task
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py finish                      # Clear active task
@@ -62,6 +63,7 @@ from common.task_context import (
     cmd_validate,
     cmd_list_context,
 )
+from common.task_artifacts import check_present_artifacts, cmd_scaffold
 
 
 # =============================================================================
@@ -92,6 +94,19 @@ def cmd_start(args: argparse.Namespace) -> int:
         task_dir = str(full_path)
 
     task_json_path = full_path / FILE_TASK_JSON
+
+    artifact_failures = check_present_artifacts(full_path)
+    if artifact_failures:
+        print(
+            colored("Error: planning artifacts are not ready; start was not changed", Colors.RED),
+            file=sys.stderr,
+        )
+        for failure in artifact_failures:
+            print(
+                f"  {failure.path.name}: {failure.code}: {failure.message}",
+                file=sys.stderr,
+            )
+        return 1
 
     if not resolve_context_key():
         # Degraded mode: no session identity available.
@@ -380,6 +395,7 @@ Usage:
   python3 task.py add-context <dir> <jsonl> <path> [reason]  Add entry to jsonl
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
+  {{PYTHON_CMD}} task.py scaffold <task> design|implement|all  Scaffold planning artifact prompts
   python3 task.py start <dir>                        Set active task
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
@@ -406,6 +422,7 @@ Examples:
   python3 task.py create "Child task" --slug child --parent .trellis/tasks/01-21-parent
   python3 task.py add-context <dir> implement .trellis/spec/cli/backend/auth.md "Auth guidelines"
   python3 task.py set-branch <dir> task/add-login
+  {{PYTHON_CMD}} task.py scaffold add-login all
   python3 task.py start .trellis/tasks/01-21-add-login
   python3 task.py current --source
   python3 task.py finish
@@ -494,6 +511,15 @@ def main() -> int:
     p_listctx = subparsers.add_parser("list-context", help="List context entries")
     p_listctx.add_argument("dir", help="Task directory")
 
+    # scaffold
+    p_scaffold = subparsers.add_parser(
+        "scaffold", help="Scaffold design.md and/or implement.md prompts"
+    )
+    p_scaffold.add_argument("task", help="Live task directory, exact name, or unique suffix")
+    p_scaffold.add_argument(
+        "artifact", choices=("design", "implement", "all"), help="Artifact to scaffold"
+    )
+
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
@@ -559,6 +585,7 @@ def main() -> int:
         "add-context": cmd_add_context,
         "validate": cmd_validate,
         "list-context": cmd_list_context,
+        "scaffold": cmd_scaffold,
         "start": cmd_start,
         "current": cmd_current,
         "finish": cmd_finish,
