@@ -25,8 +25,9 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 `get_context.py` shows the active task's `status` field. Route by `status` + artifact presence. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
-- `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** and runs `python3 ./.trellis/scripts/task.py scaffold <task> all` for missing artifacts.
-- `status=planning` + any present `design.md` / `implement.md` path is non-regular, unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines → **1.1**. It is artifact-pending, not complete; fill and review Core and triggered semantics before removing that artifact's sentinel.
+- `status=planning` + any present `design.md` / `implement.md` path is non-regular (including a symlink), unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines → **1.1**. It is artifact-pending, not complete; fill and review Core and triggered semantics before removing that artifact's sentinel.
+- `status=planning` + lightweight task with `prd.md` complete → **1.4** review.
+- `status=planning` + complex task missing either `design.md` or `implement.md` → **1.1** and run `python3 ./.trellis/scripts/task.py scaffold <task> all`, then fill and review both artifacts.
 - `status=planning` + complex artifacts machine-ready and authoring-reviewed + sub-agent jsonl not curated (only the seed `_example` row) → **1.3**
 - `status=planning` + required artifacts machine-ready and authoring-reviewed + required jsonl curated or inline mode → **1.4** (ask for start review; only run `task.py start` after user confirms)
 - `status=in_progress` + implementation not started → **2.1**

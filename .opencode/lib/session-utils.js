@@ -94,7 +94,7 @@ function getTaskStatus(ctx, platformInput = null) {
   const hasImplementPlan = planningStates["implement.md"] !== "missing"
   const artifactNames = ["prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl"]
   const present = artifactNames.filter(name =>
-    planningStates[name] !== "missing" || existsSync(join(taskDir, name))
+    (planningStates[name] ?? "missing") !== "missing" || existsSync(join(taskDir, name))
   )
   if (existsSync(join(taskDir, "research"))) present.push("research/")
   const presentLine = present.length > 0 ? present.join(", ") : "(none)"

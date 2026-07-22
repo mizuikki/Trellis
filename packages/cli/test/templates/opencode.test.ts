@@ -121,6 +121,30 @@ describe("opencode session-start history detection", () => {
     );
   });
 
+  it("does not list absent PRD or JSONL artifacts as present", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trellis-opencode-present-"));
+    const taskDir = join(dir, ".trellis", "tasks", "demo-task");
+    mkdirSync(taskDir, { recursive: true });
+    writeFileSync(join(taskDir, "task.json"), JSON.stringify({ title: "Demo", status: "planning" }));
+
+    try {
+      const context = buildSessionContext({
+        directory: dir,
+        getActiveTask: () => ({ taskPath: ".trellis/tasks/demo-task", source: "test", stale: false }),
+        getContextKey: () => null,
+        getCurrentTask: () => null,
+        readFile: () => "",
+        readProjectFile: () => "",
+        resolveTaskDir: () => taskDir,
+        runScript: () => "",
+      });
+
+      expect(context).toContain("Present: (none)");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("persists startup context and suppresses reinjection from history", async () => {
     interface ChatOutput {
       parts: {

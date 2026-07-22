@@ -157,17 +157,17 @@ describe("scaffold guidance Python rendering", () => {
     Object.defineProperty(process, "platform", { value: originalPlatform });
   });
 
-  it("uses a placeholder that renders the scaffold command for each platform", () => {
-    const command = "{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all";
+  it("uses a platform-aware literal scaffold command for each platform", () => {
+    const command = "python3 ./.trellis/scripts/task.py scaffold <task> all";
     expect(workflowMdTemplate).toContain(command);
 
     Object.defineProperty(process, "platform", { value: "win32" });
-    expect(resolvePlaceholders(command)).toBe(
+    expect(replacePythonCommandLiterals(command)).toBe(
       "python ./.trellis/scripts/task.py scaffold <task> all",
     );
 
     Object.defineProperty(process, "platform", { value: "linux" });
-    expect(resolvePlaceholders(command)).toBe(
+    expect(replacePythonCommandLiterals(command)).toBe(
       "python3 ./.trellis/scripts/task.py scaffold <task> all",
     );
   });

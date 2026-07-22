@@ -50,8 +50,12 @@ If the user wants only one platform to avoid sub-agents, first confirm whether t
 | `status` | Artifact state | Resume at |
 | --- | --- | --- |
 | `planning` | `prd.md` missing | Phase 1.1 (load `trellis-brainstorm`) |
-| `planning` | `prd.md` exists, `implement.jsonl` only has the seed `_example` row | Phase 1.3 (curate JSONL context) |
-| `planning` | `prd.md` exists, `implement.jsonl` curated | Phase 1.4 (run `task.py start`) |
+| `planning` | present design/implement artifact is non-regular (including a symlink), unreadable, non-UTF-8, or empty | artifact-invalid: replace or recreate it before planning review |
+| `planning` | present regular design/implement artifact has `<!-- trellis:scaffold-unfilled -->` in its first five lines | artifact-pending: fill and review Core and triggered semantics before removing its sentinel |
+| `planning` | lightweight task with `prd.md` complete | ask for start review, then run `task.py start` |
+| `planning` | complex task missing `design.md` or `implement.md` | run `python3 ./.trellis/scripts/task.py scaffold <task> all`, then complete artifacts |
+| `planning` | machine-ready, authoring-reviewed complex artifacts and `implement.jsonl` only has the seed `_example` row | Phase 1.3 (curate JSONL context) |
+| `planning` | machine-ready, authoring-reviewed complex artifacts and `implement.jsonl` curated | Phase 1.4 (run `task.py start`) |
 | `in_progress` | no implementation in conversation history | Phase 2.1 (`trellis-implement`) |
 | `in_progress` | implementation done, no `trellis-check` run | Phase 2.2 (`trellis-check`) |
 | `in_progress` | check passed | Phase 3.1 (verify quality + spec update) |
@@ -61,7 +65,7 @@ When you add a custom status (e.g. `in-review`), add a `[workflow-state:in-revie
 
 ## Artifact Readiness
 
-For a complex task missing `design.md` or `implement.md`, route to `python3 ./.trellis/scripts/task.py scaffold <task> all`. A present non-regular, unreadable, non-UTF-8, empty, or first-five-line `<!-- trellis:scaffold-unfilled -->` artifact is pending, not complete; fill and review Core and triggered semantics before removing its sentinel and starting the task.
+For a complex task missing `design.md` or `implement.md`, route to `python3 ./.trellis/scripts/task.py scaffold <task> all`. A present non-regular path (including a symlink), unreadable, non-UTF-8, or empty artifact must be replaced or recreated; a regular artifact with a first-five-line `<!-- trellis:scaffold-unfilled -->` sentinel is pending, not complete. Fill and review Core and triggered semantics before removing its sentinel and starting the task.
 
 ## Notes
 

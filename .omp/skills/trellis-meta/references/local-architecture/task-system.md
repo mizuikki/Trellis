@@ -30,7 +30,7 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 
 ## Artifact Lifecycle
 
-Create does not seed `design.md` or `implement.md`. For a complex task, run `python3 ./.trellis/scripts/task.py scaffold <task> all` when either is missing. A present artifact is pending when it is non-regular, unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines. Fill and review Core and triggered semantics before removing its sentinel; `task.py start` rejects pending present artifacts before state mutation and does not parse headings or prose.
+Create does not seed `design.md` or `implement.md`. For a complex task, run `python3 ./.trellis/scripts/task.py scaffold <task> all` when either is missing. A present artifact is invalid and must be replaced or recreated when it is non-regular (including a symlink), unreadable, non-UTF-8, or empty. A regular artifact with the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is an unfilled scaffold: fill and review Core and triggered semantics before removing its sentinel. `task.py start` rejects either state before state mutation and does not parse headings or prose.
 
 ## `task.json`
 

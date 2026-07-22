@@ -8,7 +8,7 @@ Usage:
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
     python3 task.py validate <dir>              # Validate jsonl files
     python3 task.py list-context <dir>          # List jsonl entries
-    {{PYTHON_CMD}} task.py scaffold <task> design|implement|all  # Add planning artifact prompts
+    python3 task.py scaffold <task> design|implement|all  # Add planning artifact prompts
     python3 task.py start <dir>                 # Set active task
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py finish                      # Clear active task
@@ -395,7 +395,7 @@ Usage:
   python3 task.py add-context <dir> <jsonl> <path> [reason]  Add entry to jsonl
   python3 task.py validate <dir>                     Validate jsonl files
   python3 task.py list-context <dir>                 List jsonl entries
-  {{PYTHON_CMD}} task.py scaffold <task> design|implement|all  Scaffold planning artifact prompts
+  python3 task.py scaffold <task> design|implement|all  Scaffold planning artifact prompts
   python3 task.py start <dir>                        Set active task
   python3 task.py current [--source]                 Show active task
   python3 task.py finish                             Clear active task
@@ -422,7 +422,7 @@ Examples:
   python3 task.py create "Child task" --slug child --parent .trellis/tasks/01-21-parent
   python3 task.py add-context <dir> implement .trellis/spec/cli/backend/auth.md "Auth guidelines"
   python3 task.py set-branch <dir> task/add-login
-  {{PYTHON_CMD}} task.py scaffold add-login all
+  python3 task.py scaffold add-login all
   python3 task.py start .trellis/tasks/01-21-add-login
   python3 task.py current --source
   python3 task.py finish

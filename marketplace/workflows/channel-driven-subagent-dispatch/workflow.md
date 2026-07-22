@@ -89,7 +89,7 @@ Phase 3: Finish  -> verify, update spec, commit, and wrap up
 
 Lightweight tasks may be PRD-only. Complex tasks must have `prd.md`, `design.md`, and `implement.md` before `task.py start`.
 
-For missing complex artifacts, run `{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all`. Scaffolds are prompts, not completed planning. Treat non-regular, unreadable, empty, or first-five-line `<!-- trellis:scaffold-unfilled -->` artifacts as pending; fill and review Core and triggered semantics before removing each sentinel. `task.py start` blocks these states without parsing headings or prose.
+For missing complex artifacts, run `python3 ./.trellis/scripts/task.py scaffold <task> all`. Scaffolds are prompts, not completed planning. Treat non-regular paths (including symlinks), unreadable, empty, or first-five-line `<!-- trellis:scaffold-unfilled -->` artifacts as pending; fill and review Core and triggered semantics before removing each sentinel. `task.py start` blocks these states without parsing headings or prose.
 
 ### Parent / Child Task Trees
 
@@ -205,7 +205,7 @@ Run only `create` here. Do not also run `start`. `start` switches status to `in_
 
 #### 1.1 Requirement exploration `[required · repeatable]`
 
-Load `trellis-brainstorm` and write user requirements into `prd.md`. Complex tasks also need reviewed `design.md` and `implement.md`; invoke `{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all` when either is missing.
+Load `trellis-brainstorm` and write user requirements into `prd.md`. Complex tasks also need reviewed `design.md` and `implement.md`; invoke `python3 ./.trellis/scripts/task.py scaffold <task> all` when either is missing.
 
 Requirements:
 

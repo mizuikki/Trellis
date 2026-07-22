@@ -446,7 +446,7 @@ After artifact review, flip the task status to `in_progress`:
 python3 ./.trellis/scripts/task.py start <task-dir>
 ```
 
-For lightweight tasks, `prd.md` can be enough. For complex tasks, `prd.md`, `design.md`, and `implement.md` must exist and pass authoring review before start. Any present design/implement path that is non-regular, unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is pending and `task.py start` rejects it before state mutation. Runtime does not infer complexity or parse headings, Semantic IDs, or prose. On sub-agent-dispatch platforms, `implement.jsonl` and `check.jsonl` must both have real curated entries before start; those manifests do not replace `implement.md`.
+For lightweight tasks, `prd.md` can be enough. For complex tasks, `prd.md`, `design.md`, and `implement.md` must exist and pass authoring review before start. Any present design/implement path that is non-regular (including a symlink), unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is pending and `task.py start` rejects it before state mutation. Runtime does not infer complexity or parse headings, Semantic IDs, or prose. On sub-agent-dispatch platforms, `implement.jsonl` and `check.jsonl` must both have real curated entries before start; those manifests do not replace `implement.md`.
 
 After this command succeeds, the breadcrumb auto-switches to `[workflow-state:in_progress]`, and the rest of Phase 2 / 3 follows.
 

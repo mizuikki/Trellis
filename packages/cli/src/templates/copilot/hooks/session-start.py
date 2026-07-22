@@ -18,7 +18,6 @@ breadcrumbs remain available as a per-turn complement.
 from __future__ import annotations
 
 import sys
-import stat
 
 # Force UTF-8 on stdin/stdout/stderr on Windows. Default codepage there is
 # cp936 / cp1252 / etc. — non-ASCII content (Chinese task names, prd snippets)
@@ -50,6 +49,7 @@ import sys
 import warnings
 from io import StringIO
 from pathlib import Path
+from typing import Literal
 
 
 def _normalize_windows_shell_path(path_str: str) -> str:
@@ -148,28 +148,20 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     return False
 
 
-_SCAFFOLD_SENTINEL = "<!-- trellis:scaffold-unfilled -->"
+def _planning_artifact_state(task_dir: Path, kind: Literal["design", "implement"]) -> str:
+    """Map canonical planning-artifact readiness to the hook's display states."""
+    from common.task_artifacts import check_artifact_readiness  # type: ignore[import-not-found]
 
-
-def _planning_artifact_state(path: Path) -> str:
-    """Return missing, ready, or a deterministic pending reason."""
-    try:
-        path_stat = path.lstat()
-    except FileNotFoundError:
-        return "missing"
-    except OSError:
-        return "unreadable"
-    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
-        return "invalid path"
-    try:
-        content = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return "unreadable or non-UTF-8"
-    if not content.strip():
-        return "empty"
-    if _SCAFFOLD_SENTINEL in content.splitlines()[:5]:
-        return "scaffold unfilled"
-    return "ready"
+    readiness = check_artifact_readiness(task_dir, kind)
+    return {
+        "missing": "missing",
+        "ready": "ready",
+        "error_invalid_target": "invalid path",
+        "error_invalid_utf8": "unreadable or non-UTF-8",
+        "error_unreadable": "unreadable",
+        "error_empty": "empty",
+        "error_unfilled": "scaffold unfilled",
+    }.get(readiness.code, "unreadable")
 
 
 def read_file(path: Path, fallback: str = "") -> str:
@@ -287,8 +279,8 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
 
     has_prd = (task_dir / "prd.md").is_file()
     planning_states = {
-        name: _planning_artifact_state(task_dir / name)
-        for name in ("design.md", "implement.md")
+        "design.md": _planning_artifact_state(task_dir, "design"),
+        "implement.md": _planning_artifact_state(task_dir, "implement"),
     }
     has_design = planning_states["design.md"] != "missing"
     has_implement = planning_states["implement.md"] != "missing"

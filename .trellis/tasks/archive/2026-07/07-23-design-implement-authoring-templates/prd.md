@@ -44,29 +44,29 @@ Product language policy matches current Trellis source:
 
 ## Acceptance Criteria
 
-- [ ] Core/Triggered/Optional rubric text in skills and canonical scaffold bodies in the helper are English-only.
-- [ ] Default `task.py create` still does not add design/implement.
-- [ ] `task.py scaffold <task> design|implement|all` is the only new create-path for skeletons; no `create --complex`.
-- [ ] Scaffold requires explicit task; argparse syntax errors return 2, while unknown/ambiguous/invalid task validation returns 1 with a clear stderr error.
-- [ ] Scaffold accepts only a non-symlink live direct child of `.trellis/tasks/` with valid non-symlink regular task metadata and non-empty title; outside/archive/nested/symlink-escape/malformed-metadata targets fail without writes.
-- [ ] Scaffold never overwrites existing regular files (including empty); exclusive create; a concurrent second writer that creates a regular file reports `skipped_exists` without clobbering.
-- [ ] Existing directory, symlink, or other non-regular artifact target is not followed/replaced and produces a hard error.
-- [ ] `scaffold all` attempts both targets, reports each result, creates missing targets, and returns non-zero iff any target has a hard error; `skipped_exists` is success.
-- [ ] Shipped product text (new scaffold constants + guidance blocks) has no Chinese section catalog; scoped test, not whole-repo free grep.
-- [ ] Both canonical scaffold bodies contain exactly one `<!-- trellis:scaffold-unfilled -->` sentinel.
-- [ ] `task.py start` rejects a present design/implement path that is non-regular, symlinked, unreadable/non-UTF-8, empty/whitespace-only, or whose first five physical lines contain the exact standalone sentinel; SessionStart reports the same states as artifact-pending, and continue/start guidance routes the agent back to authoring review.
-- [ ] Filled regular artifacts pass the machine gate after sentinel removal; later prose/code mentions do not trigger it.
-- [ ] Machine-facing copy does not claim “artifacts complete” for pristine scaffold; agent rubric states Core must be filled before sentinel removal and start review.
-- [ ] Lightweight missing design/implement is not a global error.
-- [ ] Skill/workflow note UI `DESIGN.md` ≠ tech `design.md`.
-- [ ] `common/task_artifacts.py` is the only canonical scaffold-body source and owns the artifact lifecycle contract; brainstorm calls scaffold instead of embedding/writing a duplicate body.
+- [x] Core/Triggered/Optional rubric text in skills and canonical scaffold bodies in the helper are English-only.
+- [x] Default `task.py create` still does not add design/implement.
+- [x] `task.py scaffold <task> design|implement|all` is the only new create-path for skeletons; no `create --complex`.
+- [x] Scaffold requires explicit task; argparse syntax errors return 2, while unknown/ambiguous/invalid task validation returns 1 with a clear stderr error.
+- [x] Scaffold accepts only a non-symlink live direct child of `.trellis/tasks/` with valid non-symlink regular task metadata and non-empty title; outside/archive/nested/symlink-escape/malformed-metadata targets fail without writes.
+- [x] Scaffold never overwrites existing regular files (including empty); exclusive create; a concurrent second writer that creates a regular file reports `skipped_exists` without clobbering.
+- [x] Existing directory, symlink, or other non-regular artifact target is not followed/replaced and produces a hard error.
+- [x] `scaffold all` attempts both targets, reports each result, creates missing targets, and returns non-zero iff any target has a hard error; `skipped_exists` is success.
+- [x] Shipped product text (new scaffold constants + guidance blocks) has no Chinese section catalog; scoped test, not whole-repo free grep.
+- [x] Both canonical scaffold bodies contain exactly one `<!-- trellis:scaffold-unfilled -->` sentinel.
+- [x] `task.py start` rejects a present design/implement path that is non-regular, symlinked, unreadable/non-UTF-8, empty/whitespace-only, or whose first five physical lines contain the exact standalone sentinel; SessionStart reports the same states as artifact-pending, and continue/start guidance routes the agent back to authoring review.
+- [x] Filled regular artifacts pass the machine gate after sentinel removal; later prose/code mentions do not trigger it.
+- [x] Machine-facing copy does not claim “artifacts complete” for pristine scaffold; agent rubric states Core must be filled before sentinel removal and start review.
+- [x] Lightweight missing design/implement is not a global error.
+- [x] Skill/workflow note UI `DESIGN.md` ≠ tech `design.md`.
+- [x] `common/task_artifacts.py` is the only canonical scaffold-body source and owns the artifact lifecycle contract; brainstorm calls scaffold instead of embedding/writing a duplicate body.
 - [x] The Marketplace-merge prerequisite is complete in `d01aee69`: `.gitmodules` no longer declares marketplace, `marketplace/` is tracked by the main repository, and provenance records upstream commit `758398b89e159f4b6658383dd26c484da423ba93`.
 - [x] Marketplace workflow mirrors are same-repository files and can be updated with their owning workflow contract; no Marketplace submodule commit or pointer bump is required.
-- [ ] Every exact path in the active implementation matrix is updated or explicitly marked N/A with a reason; completed prerequisite evidence remains unchanged unless a regression is found.
-- [ ] Python changes pass `pnpm --filter @mindfoldhq/trellis lint:py` in addition to tests/typecheck.
-- [ ] Semantic IDs appear in product docs/tests as labels only; no requirement that user task files keep ID comments permanently.
-- [ ] Scaffold commands render through `{{PYTHON_CMD}}` in shipped templates, with Windows and non-Windows assertions.
-- [ ] Filesystem tests distinguish the guaranteed target-file race behavior from the documented stable-parent-directory assumption.
+- [x] Every exact path in the active implementation matrix is updated or explicitly marked N/A with a reason; completed prerequisite evidence remains unchanged unless a regression is found.
+- [x] Python changes pass `pnpm --filter @mindfoldhq/trellis lint:py` in addition to tests/typecheck.
+- [x] Semantic IDs appear in product docs/tests as labels only; no requirement that user task files keep ID comments permanently.
+- [x] Scaffold commands render through platform-aware `python` / `python3` guidance, with Windows and non-Windows assertions.
+- [x] Filesystem tests distinguish the guaranteed target-file race behavior from the documented stable-parent-directory assumption.
 
 ## Out of Scope
 

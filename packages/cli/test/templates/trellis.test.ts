@@ -129,6 +129,8 @@ describe("trellis template constants", () => {
     for (const relativePath of [...sourceConsumers, ...trackedConsumers]) {
       const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
       for (const id of semanticIds) expect(content).toContain(id);
+      expect(content).toContain("scaffold-unfilled");
+      expect(content).toContain("non-regular");
     }
     for (const relativePath of sourceConsumers) {
       const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
@@ -140,7 +142,7 @@ describe("trellis template constants", () => {
     expect(commonTaskArtifacts).toContain("def _default_implement_content");
   });
 
-  it("keeps new scaffold and guidance text English-only without parsing user headings", () => {
+  it("keeps new scaffold and guidance text free of CJK ideographs without parsing user headings", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()
       : path.resolve(process.cwd(), "../..");

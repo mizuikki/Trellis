@@ -71,7 +71,7 @@ python3 ./.trellis/scripts/task.py remove-subtask <parent-dir> <child-dir>
 
 `children` on the parent is a historical list. When a child is archived, Trellis keeps that child name in the parent so progress like `[2/3 done]` remains meaningful after completed children move to `archive/`.
 
-The AI should not treat phase numbers as task status. Task progress is mainly determined by `status`, artifact readiness (`prd.md`, optional `design.md` / `implement.md`), whether JSONL context is configured for sub-agent mode, and the phase descriptions in `workflow.md`. A present design/implement artifact is pending when it is non-regular, unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines.
+The AI should not treat phase numbers as task status. Task progress is mainly determined by `status`, artifact readiness (`prd.md`, optional `design.md` / `implement.md`), whether JSONL context is configured for sub-agent mode, and the phase descriptions in `workflow.md`. A present design/implement artifact is invalid and must be replaced or recreated when it is non-regular (including a symlink), unreadable, non-UTF-8, or empty. A regular artifact with the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is an unfilled scaffold that must be filled and reviewed before its sentinel is removed.
 
 ## Active Task
 
