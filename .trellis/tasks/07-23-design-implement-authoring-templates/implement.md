@@ -67,7 +67,7 @@
 - [x] 4.2 Update the exact trellis-meta `task-system.md` and `change-workflow.md` source/dogfood paths in the matrix.
 - [x] 4.3 Manual smoke: lightweight create; safe scaffold; start blocked by sentinel; fill/review Core; remove sentinel; empty Optional deleted; start succeeds.
 - [x] 4.4 Confirm Marketplace workflow files are normal main-repository changes, not a dirty submodule or pointer update.
-- [ ] 4.5 Formal product task: check → commit (this `tmp/` set is not the product ship).
+- [x] 4.5 Formal product task: check → commit (this `tmp/` set is not the product ship).
 
 ## Completed prerequisite evidence
 
