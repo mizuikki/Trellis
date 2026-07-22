@@ -13,18 +13,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const downloadTemplateMock = vi.fn(async (_source: string, options: { dir: string }) => {
-  fs.mkdirSync(options.dir, { recursive: true });
-  fs.writeFileSync(path.join(options.dir, "marker.txt"), "content");
-  return {};
-});
+const downloadTemplateMock = vi.fn(
+  async (_source: string, options: { dir: string }) => {
+    fs.mkdirSync(options.dir, { recursive: true });
+    fs.writeFileSync(path.join(options.dir, "marker.txt"), "content");
+    return {};
+  },
+);
 
 vi.mock("giget", () => ({
   downloadTemplate: (...args: [string, { dir: string }]) =>
     downloadTemplateMock(...args),
 }));
 
-const { downloadWithStrategy } = await import("../../src/utils/template-fetcher.js");
+const { downloadWithStrategy } =
+  await import("../../src/utils/template-fetcher.js");
 
 describe("downloadWithStrategy — #383 preferOffline removed", () => {
   afterEach(() => {
@@ -40,6 +43,20 @@ describe("downloadWithStrategy — #383 preferOffline removed", () => {
     expect(downloadTemplateMock).toHaveBeenCalledTimes(1);
     const options = downloadTemplateMock.mock.calls[0][1];
     expect(options).not.toHaveProperty("preferOffline");
+
+    fs.rmSync(destDir, { recursive: true, force: true });
+  });
+
+  it("uses the Trellis fork marketplace when no repository is provided", async () => {
+    const destDir = fs.mkdtempSync(path.join(os.tmpdir(), "trellis-dl-"));
+    fs.rmSync(destDir, { recursive: true, force: true });
+
+    await downloadWithStrategy("specs/electron-fullstack", destDir, "skip");
+
+    expect(downloadTemplateMock).toHaveBeenCalledWith(
+      "gh:mizuikki/Trellis/marketplace/specs/electron-fullstack",
+      { dir: destDir },
+    );
 
     fs.rmSync(destDir, { recursive: true, force: true });
   });

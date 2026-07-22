@@ -104,6 +104,16 @@ Required built-ins:
 - `tdd`
 - `channel-driven-subagent-dispatch`
 
+Default marketplace source:
+
+- `marketplace/` is a vendored directory tracked by the main Trellis
+  repository, not a separately released repository.
+- The default index is
+  `https://raw.githubusercontent.com/mizuikki/Trellis/main/marketplace/index.json`.
+- Default template downloads use `gh:mizuikki/Trellis/marketplace`.
+- Explicit `--marketplace`, `--workflow-source`, and registry configuration
+  continue to override the default source.
+
 Ownership contract:
 
 - `native` is Trellis-managed. After writing it, refresh the
@@ -128,8 +138,10 @@ Native source-of-truth contract:
 
 - `packages/cli/src/templates/trellis/workflow.md` is the source of truth for
   native workflow.
-- If `marketplace/workflows/native/workflow.md` exists, tests must enforce byte
-  identity with the bundled native template.
+- `marketplace/workflows/**` are same-repository catalog mirrors. Changes are
+  reviewed and committed with their owning bundled/spec changes.
+- Tests must enforce byte identity between
+  `marketplace/workflows/native/workflow.md` and the bundled native template.
 
 ### 4. Validation & Error Matrix
 

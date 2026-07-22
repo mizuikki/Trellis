@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   downloadRegistryDirect,
   downloadTemplateById,
+  fetchTemplateIndex,
   getInstallPath,
   normalizeRegistrySource,
   parseRegistrySource,
@@ -15,6 +16,25 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("default marketplace", () => {
+  it("fetches the vendored catalog from the Trellis fork", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ version: 1, templates: [] }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchTemplateIndex();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/mizuikki/Trellis/main/marketplace/index.json",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
 });
 
 // =============================================================================

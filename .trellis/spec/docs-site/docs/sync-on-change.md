@@ -69,7 +69,11 @@ Audit ALL of these, in BOTH the source and any independent copies:
 | `packages/cli/src/templates/common/commands/continue.md` | resume-routing table: `status=... → **<step>**` |
 | `packages/cli/src/templates/common/bundled-skills/trellis-meta/references/customize-local/change-workflow.md` | resume-at status-transition table: `Phase <step> (...)` |
 | `packages/cli/src/templates/copilot/prompts/finish-work.prompt.md` | Phase 3 ASCII flow list |
-| `marketplace/workflows/{native,tdd,channel-driven-subagent-dispatch}/workflow.md` | full independent workflow copies — same step body + Phase Index + breadcrumb scope ranges |
+| `marketplace/workflows/{native,tdd,channel-driven-subagent-dispatch}/workflow.md` | same-repository catalog copies - same step body + Phase Index + breadcrumb scope ranges |
+
+`marketplace/` is vendored into the main repository. Workflow mirror changes
+are staged and committed with the source/template changes that require them;
+there is no separate Marketplace gitlink, checkout, or push step.
 
 Grep patterns that catch bare-number routing (run from repo root):
 

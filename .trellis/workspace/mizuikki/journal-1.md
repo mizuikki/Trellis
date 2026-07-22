@@ -77,3 +77,39 @@ Hardened bounded sub-agent context across shared Python, Pi, OMP, and OpenCode w
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Vendor Marketplace into main repository
+
+**Date**: 2026-07-22
+**Task**: Vendor Marketplace into main repository
+**Package**: cli
+**Branch**: `feat/vendor-marketplace`
+
+### Summary
+
+Imported the pinned Marketplace snapshot as ordinary repository files, documented provenance, redirected CLI defaults, removed submodule assumptions from CI and release flows, updated tests and specs, and verified a fresh checkout initializes only docs-site.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7c4441f9` | (see git log) |
+| `ed003211` | (see git log) |
+| `6578179b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
