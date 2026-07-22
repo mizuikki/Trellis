@@ -67,7 +67,7 @@ These directories are copied to `dist/` during build and used as templates:
 │   └── index.md         # Index template (dogfooded)
 ├── spec/                # Project guidelines (NOT dogfooded)
 │   ├── cli/             # CLI package specs (backend/, unit-test/)
-│   ├── docs-site/       # Docs package specs (docs/)
+│   ├── core/            # Core package specs (backend/)
 │   └── guides/          # Thinking guides
 ├── workflow.md          # Workflow documentation (dogfooded)
 └── .gitignore           # Git ignore rules (dogfooded)

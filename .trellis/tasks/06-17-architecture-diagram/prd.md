@@ -31,7 +31,7 @@ Two of the other in-flight tasks depend on this. `community-governance` needs vo
 - `docs/architecture.md` promotion (separate follow-up task).
 - CI drift gate test (deferred to promotion task).
 - `pnpm gen:arch-diagram` script wired into pnpm scripts (deferred; owner runs by hand for now).
-- README / docs-site updates (deferred to promotion task).
+- README / external docs updates (deferred to promotion task).
 - ASCII fallback for npm registry (deferred to promotion task).
 - Sequence diagrams (age fastest, low value).
 - C4 ceremony / formal syntax.

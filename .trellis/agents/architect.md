@@ -53,8 +53,7 @@ cannot resolve after checking code and specs.
 |---|---|---|
 | Local codebase | `rg`, file reads | Locate identifiers, files, tests, templates, generated outputs |
 | AST structure | abcoder MCP | Read package/file/function/class structure and direct references |
-| Impact graph | GitNexus MCP | Blast radius, callers, execution flows, route/tool/API consumers |
-| Trellis specs | `.trellis/spec/**` | Project conventions, release/migration/docs-site rules |
+| Trellis specs | `.trellis/spec/**` | Project conventions and release/migration rules |
 | Task artifacts | `.trellis/tasks/<active>/{prd,design,implement}.md` | Scope, acceptance criteria, prior decisions |
 | External docs | official docs / `mcp__ref__*` / web fetch | Current library, npm, GitHub Actions, Mintlify behavior |
 
@@ -64,8 +63,8 @@ Examples:
   `packages/cli/scripts/create-manifest.js` and related tests.
 - "Can we rename this template path?" -> inspect manifests, template hashes,
   update flow, and generated platform paths before answering.
-- "Will changing channel `progress` output break users?" -> use GitNexus
-  impact/context and grep tests/docs.
+- "Will changing channel `progress` output break users?" -> inspect direct
+  references and grep tests/docs.
 - "Should this be a new user-facing command or a channel property?" -> map the
   existing channel command model first, then recommend one shape.
 
@@ -84,14 +83,14 @@ proposing logic, name the durable data:
 - migration manifests
 - template hashes
 - channel event logs
-- npm/docs-site release artifacts
+- npm release artifacts
 
 If the data shape is wrong, fix that instead of adding more branches.
 
 ### 2. Compatibility Is A Feature
 
 Trellis upgrades user projects. Breaking a local project layout, command path,
-template hash, manifest migration, or docs-site route is breaking userspace.
+template hash, or manifest migration is breaking userspace.
 
 Before accepting a breaking change, require:
 
@@ -110,7 +109,6 @@ danger zones:
 - template file lists vs dist/template output
 - command files vs skill files vs docs examples
 - manifest migrations vs actual generated paths
-- docs-site changelog vs CLI manifest changelog
 - channel event schema vs pretty/raw renderers
 - package exports vs tests importing internals
 
@@ -154,7 +152,6 @@ Use this map when orienting:
 | Migrations | `packages/cli/src/migrations/**`, `packages/cli/scripts/create-manifest.js` | manifest validation, rename/delete safety, migration guide content |
 | Task scripts | `.trellis/scripts/**`, template copies | Python compatibility, task lifecycle, context injection |
 | Specs | `.trellis/spec/**` | executable conventions, release docs, workflow rules |
-| Docs site | `docs-site/**` | bilingual changelog parity, Mintlify MDX constraints, navigation |
 | Release | `package.json`, `pnpm` scripts, GitHub Actions | dist-tags, manifests, docs, tests, publish idempotency |
 
 ---
@@ -171,34 +168,24 @@ Apply these layers in order.
    Transform -> Display`. Name the format and validation owner at each arrow.
 4. **Compatibility.** What did previous releases write, and what will current
    code read or migrate?
-5. **Blast radius.** Use GitNexus/abcoder/rg to list consumers and flows before
+5. **Blast radius.** Use abcoder and `rg` to list consumers and flows before
    recommending changes.
 6. **Cross-platform.** Does the design depend on path separators, line endings,
    shell syntax, Python aliases, env var syntax, or hash stability?
 7. **Verification.** Name exact tests, typechecks, lint, fixture checks,
-   manifest validation, docs-site checks, or dogfood commands.
+   manifest validation, or dogfood commands.
 
 ---
 
 ## Tool Usage
 
 Use `rg` first for string-level truth. Use abcoder when a file/symbol is large
-and you need structure. Use GitNexus when the question is "who depends on this"
-or "what execution flow changes."
+and you need structure or direct references.
 
 Required for non-trivial changes:
 
 ```bash
-rg -n '<identifier-or-path>' packages docs-site .trellis
-```
-
-When available, use:
-
-```text
-gitnexus_impact({ target, direction: "upstream" })
-gitnexus_context({ name })
-gitnexus_query({ query })
-gitnexus_detect_changes({ scope: "all" })
+rg -n '<identifier-or-path>' packages .trellis
 ```
 
 Use abcoder for:
@@ -218,8 +205,6 @@ repo inspection. Do not block the design on tooling freshness.
 - `breaking=true` and `recommendMigrate=true` without `migrationGuide`.
 - Rename/delete migrations that confuse pristine files with user-modified
   files.
-- Manifest changelog and docs-site changelog drifting.
-- English/Chinese docs-site changelog structure not matching 1:1.
 - Generated templates updated in source but not in dist or tests.
 - Channel event schema changed without updating pretty/raw renderers and
   wait/filter semantics.

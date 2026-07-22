@@ -63,8 +63,8 @@ max_journal_lines: 2000
 #     path: packages/frontend
 #   backend:
 #     path: packages/backend
-#   docs:
-#     path: docs-site
+#   website:
+#     path: website
 #     type: submodule
 #   # For polyrepo / meta-repo layouts (independent .git in each subdir),
 #   # mark the package with `git: true`. The runtime treats it as an
@@ -77,9 +77,6 @@ packages:
     path: packages/cli
   core:
     path: packages/core
-  docs-site:
-    path: docs-site
-    type: submodule
 
 # Default package used when --package is not specified.
 default_package: cli

@@ -13,7 +13,7 @@ Execute these steps:
    ```
 
 3. **Identify which specs apply** to your task based on:
-   - Which package you're modifying (e.g., `cli/`, `docs-site/`)
+   - Which package you're modifying (e.g., `cli/`, `core/`)
    - What type of work (backend, frontend, unit-test, docs, etc.)
    - Any spec/research paths referenced by the task artifacts
 

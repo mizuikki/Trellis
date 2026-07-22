@@ -41,7 +41,7 @@ When `packages:` is defined in `config.yaml`, specs are organized per-package:
 │       ├── index.md
 │       └── *.md
 │
-├── docs-site/                  # Package: docs-site
+├── website/                    # Package: website
 │   └── docs/
 │       ├── index.md
 │       └── *.md

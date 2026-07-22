@@ -15,7 +15,7 @@ Ordered, with verification gates. Stop on red. **All harness state lives in `tmp
 ## Phase 1 — Harness scaffolding
 
 - [ ] 1.1 Pick isolation approach per 0.3:
-  - If Docker: `tmp/benchmark/docker/base.Dockerfile` (node 20 + python 3.12 + pnpm + claude-cli + codex-cli + gitnexus + jq + git) and per-commit Dockerfiles anchored at parent SHA with `.git` truncated.
+  - If Docker: `tmp/benchmark/docker/base.Dockerfile` (node 20 + python 3.12 + pnpm + claude-cli + codex-cli + jq + git) and per-commit Dockerfiles anchored at parent SHA with `.git` truncated.
   - If worktrees: `tmp/benchmark/worktrees/<commit>/` snapshots, repo cloned to a fresh path with `.git` truncated.
 - [ ] 1.2 `tmp/benchmark/arms/A-bare/`, `B-docs-only/`, `C-trellis/`: each contains a `setup.sh` preparing the arm.
 - [ ] 1.3 `tmp/benchmark/runner/run.ts`: spawn isolated cell, run agent against task brief, capture token meters + transcript + final diff.
@@ -84,7 +84,7 @@ pnpm bench reproduce tmp/benchmark/results/2026-06-20/
 
 If any of these come up during implementation, push back and file as new tasks:
 - Anything that leaves `tmp/` (e.g. committing harness or report to git).
-- Public blog post / docs-site / npm README content.
+- Public blog post / external docs / npm README content.
 - Negative-control commits (revisit in v2 if internal results suggest cherry-picking concerns).
 - Channel multi-agent benchmarks.
 - Comparing against Cline / Aider (v2 deferred).

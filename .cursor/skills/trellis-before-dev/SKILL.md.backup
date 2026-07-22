@@ -8,7 +8,7 @@ Execute these steps:
    ```
 
 2. **Identify which specs apply** to your task based on:
-   - Which package you're modifying (e.g., `cli/`, `docs-site/`)
+   - Which package you're modifying (e.g., `cli/`, `core/`)
    - What type of work (backend, frontend, unit-test, docs, etc.)
 
 3. **Read the spec index** for each relevant module:

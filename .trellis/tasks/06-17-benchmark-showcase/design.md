@@ -8,7 +8,7 @@
 tmp/benchmark/
 ├── PROTOCOL.md            # pre-registered protocol (frozen by content hash, recorded in results)
 ├── docker/                # OR worktrees/ if Docker is overkill (see tradeoffs)
-│   ├── base.Dockerfile    # node + python + pnpm + claude-cli + codex-cli + gitnexus
+│   ├── base.Dockerfile    # node + python + pnpm + claude-cli + codex-cli
 │   └── per-commit/        # one image per benchmark commit, anchored at parent SHA
 ├── arms/
 │   ├── A-bare/             # config + system prompt for vanilla arm

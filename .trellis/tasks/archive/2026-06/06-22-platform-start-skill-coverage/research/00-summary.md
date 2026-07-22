@@ -13,7 +13,6 @@
 5. **Reasonix runAs:subagent** (`05-`) — R1 后 trellis-start 以普通 skill 形式写入 `.reasonix/skills/`，与 `runAs: subagent` 的 trellis-check / trellis-implement **不冲突**（agentNames filter 只挡 implement/check，不挡 start）。
 6. **测试影响面** (`06-`) — 只有一处测试断言需要改：`platforms.test.ts:280-307`（去掉末尾的多余 `, "trellis-start"`）；其余 11 处 trellis-start 引用都不受影响；`resolveTrellisStartSkill` 无专门 unit test，R2 删除时不需删测试；**建议**为 zcode / opencode / reasonix 各加 start 输出断言。
 7. **migration / 升级影响** (`07-`) — codex / zcode 的 trellis-start 在 R1 前后 **byte-identical**，`trellis update` 不会误报；opencode / reasonix 是首次新增文件，无 modify 冲突；**不需要 migration manifest**（PRD 判断正确）。
-8. **GitNexus impact**（`08-`） — index stale，未实跑 `impact()`，但 grep 等价分析显示 risk MEDIUM（条件只收紧不放宽），byte-identity 保护已足够；建议 implement agent 跑一次全仓 grep `resolveTrellisStartSkill|resolveCodexTrellisStartSkill` 兜底。
 
 ## 对 PRD 的修订建议（按优先级排）
 
@@ -45,5 +44,4 @@
 
 - 没动 `.trellis/workflow.md` rendered output，按 PRD Out of Scope 处理
 - 没动 `.trellis/spec/`
-- 没跑 GitNexus `impact()` MCP 工具（index stale + grep 已足够）
 - 没尝试为 zcode/reasonix 加 hook（PRD Out of Scope）

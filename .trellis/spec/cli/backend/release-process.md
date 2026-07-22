@@ -1,6 +1,6 @@
 # Release Process
 
-> Release, versioning, docs, and npm publishing rules for the Trellis monorepo.
+> Release, versioning, and npm publishing rules for the Trellis monorepo.
 
 ---
 
@@ -73,7 +73,7 @@ node packages/cli/scripts/release-preflight.js publish-plan
 | Stable | `main` | `X.Y.Z` | `latest` | Patch/minor/major GA releases. |
 | Beta | `feat/vX.Y.Z-beta` or equivalent long-lived beta branch | `X.Y.Z-beta.N` | `beta` | Feature incubation. CLI and core both publish beta versions. |
 | RC | release candidate branch or the stabilized beta branch | `X.Y.Z-rc.N` | `rc` | Pre-GA validation. CLI and core both publish rc versions. |
-| GA promotion | stable release branch / `main` | `X.Y.Z` | `latest` | Promote the release candidate into the stable docs and latest npm tag. |
+| GA promotion | stable release branch / `main` | `X.Y.Z` | `latest` | Promote the release candidate to the latest npm tag. |
 
 A new beta cycle starts from the current stable/release baseline and uses the next minor or major version, for example `0.6.0-beta.0` after `0.5.x`. It does not continue an older beta line after that line has moved to RC or GA.
 
@@ -81,80 +81,14 @@ Stable fixes normally flow from `main` to beta/rc by cherry-pick. Beta-only feat
 
 ---
 
-## Docs-site lifecycle
-
-The docs-site root path holds the current stable docs. Beta and RC content live under `beta/` and `rc/`.
-
-| Transition | Script | When |
-|---|---|---|
-| Start a new beta | `docs-site/scripts/docs-beta-start.sh` | Before the first `pnpm release:beta` for a new minor/major, for example `0.6.0-beta.0`. |
-| Beta to RC | `docs-site/scripts/docs-beta-to-rc.sh` | Before the first `pnpm release:rc`, for example `0.6.0-rc.0`. |
-| RC to GA | `docs-site/scripts/docs-promote.sh` | Before `pnpm release:promote`. |
-
-Per-patch beta, RC, or GA releases do not run these lifecycle scripts. They add changelog MDX files, update `docs-site/docs.json`, commit the docs-site submodule first, then bump the submodule pointer in the main repo.
-
-Full docs details live in `.trellis/spec/docs-site/docs/release-lifecycle.md`.
-
----
-
-## Submodule commit ordering
-
-`docs-site` is the only submodule. When a release touches it, commit and push
-the docs repository first, then commit its pointer in the main repository.
-`marketplace/` is vendored main-repository content and follows normal staging
-and commit ownership; it has no separate push step.
-
-Correct order:
-
-```bash
-cd docs-site
-git add . && git commit -m "docs: changelog v<version>" && git push origin main
-
-cd ..
-git add docs-site
-git commit -m "chore: bump docs-site for v<version>"
-git push origin <branch>
-```
-
-`packages/cli/scripts/release.js` excludes `docs-site` from automatic
-pre-release staging so its pointer cannot be hidden inside a generic release
-commit. Marketplace files are deliberately included in that staging sweep.
-
-### Contract: every modified submodule must be pushed before the version tag
-
-The tag-triggered `publish.yml` CI runs `git submodule update --init --recursive` against the tagged commit. If **any** submodule pointer references a SHA that doesn't exist on the submodule's remote, CI fails at checkout with:
-
-```
-fatal: remote error: upload-pack: not our ref <SHA>
-fatal: Fetched in submodule path '<name>', but it did not contain <SHA>. Direct fetching of that commit failed.
-```
-
-Verify every declared submodule before `pnpm release` (currently only
-`docs-site`):
-
-```bash
-git submodule foreach 'sha=$(git rev-parse HEAD); git ls-remote origin $sha | grep -q $sha && echo "ok $name" || echo "FAIL $name $sha not on remote"'
-```
-
-Any `FAIL` line means: `cd <submodule> && git checkout -B main && git push
-origin main` before tagging. If the tag was already pushed when you discover
-the miss, recover by pushing the submodule then re-running the failed CI jobs
-(`gh run rerun <id> --failed`) - no new tag is needed.
-
-> **Historical incident (2026-06, v0.6.4).** The former Marketplace gitlink
-> pointed at an unpushed mirror commit, so tag checkout failed before tests.
-> Vendoring Marketplace into the main repository removes that independent
-> pointer/push failure mode. The remaining `docs-site` pointer is why the
-> submodule preflight above is still mandatory.
-
 ### Contract: the pre-release sweep MUST exclude `.trellis/`
 
 The pre-release `git add` in `release.js` (the `chore: pre-release updates`
-commit) **must** exclude `.trellis/` from its pathspec, alongside `docs-site`.
-It must not exclude `marketplace/`, which is owned by the main repository:
+commit) **must** exclude `.trellis/` from its pathspec. It must not exclude
+`marketplace/`, which is owned by the main repository:
 
 ```js
-run("git add -A -- ':!docs-site' ':!.trellis'");
+run("git add -A -- ':!.trellis'");
 ```
 
 `.trellis/tasks/` is not gitignored, so a blanket `git add -A` sweeps in any
@@ -208,17 +142,16 @@ pnpm release:promote
 `packages/cli/scripts/release.js` runs:
 
 1. `check-manifest-continuity`
-2. `check-docs-changelog --type beta|rc|promote` for prerelease/promotion tracks
-3. core tests
-4. CLI tests
-5. pre-release commit excluding `docs-site` and `.trellis`, while including
+2. core tests
+3. CLI tests
+4. pre-release commit excluding `.trellis`, while including
    vendored `marketplace/` changes
-6. `bump-versions.js <type>` to update both package versions together
-7. `release-preflight check-versions`
-8. version commit with the version string as the commit message
-9. git tag `v<version>`
-10. push branch and tags
-11. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
+5. `bump-versions.js <type>` to update both package versions together
+6. `release-preflight check-versions`
+7. version commit with the version string as the commit message
+8. git tag `v<version>`
+9. push branch and tags
+10. GitHub Actions publish workflow builds, tests, packs, publishes, and verifies both packages
 
 The release script does not publish locally. The pushed tag is what starts official npm publication.
 
@@ -267,7 +200,7 @@ workflow, hook, script, or generated platform asset:
 
 This gate is required when docs are updated before or separately from the code
 branch that actually adds the distributable files. A source file existing on
-another branch, in `marketplace/`, or in a docs submodule is not evidence that
+another branch or in `marketplace/` is not evidence that
 the npm package contains it.
 
 Example for a built-in multi-file skill:
@@ -299,9 +232,6 @@ git -C "$tmpdir" init -q
 - [ ] Worktree is clean except intentional release changes.
 - [ ] Relevant coding specs have been read.
 - [ ] Manifest exists for the target version.
-- [ ] English and Chinese docs-site changelogs exist and match 1:1.
-- [ ] `docs-site/docs.json` points to the new changelog.
-- [ ] Submodule commits are pushed before main repo pointer commits.
 - [ ] `node packages/cli/scripts/release-preflight.js check-versions` passes.
 - [ ] `node packages/cli/scripts/release-preflight.js verify-packed-cli` passes.
 - [ ] Release-claimed bundled assets are verified in `npm pack --dry-run --json` and a fresh temp-directory `trellis init` / `trellis update --dry-run` smoke test.
@@ -315,5 +245,4 @@ git -C "$tmpdir" init -q
 
 - Core/CLI code ownership and package boundaries: `trellis-core-sdk.md`
 - Manifest format and migration types: `migrations.md`
-- Docs lifecycle: `.trellis/spec/docs-site/docs/release-lifecycle.md`
 - Native dependency policy: `quality-guidelines.md`

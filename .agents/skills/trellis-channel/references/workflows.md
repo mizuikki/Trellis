@@ -39,7 +39,7 @@ Minimum round structure:
 Optional rounds:
 
 - Operations: logs, debugging, stuck workers, kill/restart, recovery.
-- Migration/release: breaking status, manifest, changelog, docs-site.
+- Migration/release: breaking status, manifest, changelog, and publishing.
 - Opposition review: ask the peer agent to argue against the current plan.
 
 Every probe should request concrete file paths, commands, schema, rejected

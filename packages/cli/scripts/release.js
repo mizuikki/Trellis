@@ -4,7 +4,7 @@
  *
  * This keeps package.json as a thin command table while the release sequence
  * stays in one place:
- *   manifest/docs guards -> tests -> pre-release commit -> synchronized bump
+ *   manifest guard -> tests -> pre-release commit -> synchronized bump
  *   -> version check -> version commit -> tag -> push
  */
 import { execSync } from "node:child_process";
@@ -58,12 +58,6 @@ function hasGitDiff() {
   }
 }
 
-function docsGuard(type) {
-  if (type === "beta" || type === "rc" || type === "promote") {
-    run(`node scripts/check-docs-changelog.js --type ${type}`);
-  }
-}
-
 function pushTarget(type) {
   return type === "beta" || type === "rc" ? "HEAD" : "main";
 }
@@ -75,7 +69,6 @@ function main() {
   }
 
   run("node scripts/check-manifest-continuity.js");
-  docsGuard(type);
   run("pnpm --filter @mindfoldhq/trellis-core test");
   run("pnpm test");
 
@@ -83,7 +76,7 @@ function main() {
   // (parallel in-progress work, runtime artifacts) must never be swept into
   // "chore: pre-release updates" (#303). Staging .trellis/ only ever goes
   // through safe_commit.py's precise allowlist, never a blanket `git add -A`.
-  run("git add -A -- ':!docs-site' ':!.trellis'");
+  run("git add -A -- ':!.trellis'");
   if (hasGitDiff()) {
     run("git commit -m 'chore: pre-release updates'");
   }

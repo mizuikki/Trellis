@@ -367,13 +367,13 @@ describe("detectMonorepo", () => {
   it("detects .gitmodules", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".gitmodules"),
-      '[submodule "docs-site"]\n\tpath = docs-site\n\turl = https://example.com/docs.git\n',
+      '[submodule "website"]\n\tpath = website\n\turl = https://example.com/docs.git\n',
     );
-    mkPkg("docs-site", "docs-site");
+    mkPkg("website", "website");
 
     const result = assertPackages(detectMonorepo(tmpDir));
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("docs-site");
+    expect(result[0].name).toBe("website");
     expect(result[0].isSubmodule).toBe(true);
   });
 
@@ -428,19 +428,19 @@ describe("detectMonorepo", () => {
   it("merges pnpm workspace + .gitmodules and marks submodule", () => {
     fs.writeFileSync(
       path.join(tmpDir, "pnpm-workspace.yaml"),
-      "packages:\n  - 'packages/*'\n  - 'docs-site'\n",
+      "packages:\n  - 'packages/*'\n  - 'website'\n",
     );
     fs.writeFileSync(
       path.join(tmpDir, ".gitmodules"),
-      '[submodule "docs-site"]\n\tpath = docs-site\n\turl = https://example.com\n',
+      '[submodule "website"]\n\tpath = website\n\turl = https://example.com\n',
     );
     mkPkg("packages/cli", "@trellis/cli");
-    mkPkg("docs-site", "docs-site");
+    mkPkg("website", "website");
 
     const result = assertPackages(detectMonorepo(tmpDir));
     expect(result).toHaveLength(2);
 
-    const docsPkg = result.find((p) => p.path === "docs-site");
+    const docsPkg = result.find((p) => p.path === "website");
     expect(docsPkg?.isSubmodule).toBe(true);
 
     const cliPkg = result.find((p) => p.path === "packages/cli");

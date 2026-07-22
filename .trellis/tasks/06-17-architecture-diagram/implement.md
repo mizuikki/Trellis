@@ -59,7 +59,7 @@ Ordered. This task lands first of the three parent tasks so its glossary unblock
 ## Phase 7 — Wrap + create promotion follow-up
 
 - [ ] 7.1 `task.py create "Promote architecture diagram to docs/" --slug promote-architecture-to-docs` linking back to `tmp/architecture/architecture.md` snapshot.
-- [ ] 7.2 Promotion follow-up's PRD scope (drafted now, refined later): move to `docs/architecture.md`, add `pnpm gen:arch-diagram` script, add CI drift gate test, ASCII fallback for npm, README + docs-site mount.
+- [ ] 7.2 Promotion follow-up's PRD scope (drafted now, refined later): move to `docs/architecture.md`, add `pnpm gen:arch-diagram` script, add CI drift gate test, ASCII fallback for npm, README + external docs mount.
 - [ ] 7.3 `task.py finish` + archive this v1 task. v1 planning artifacts remain tracked by Trellis; `tmp/architecture/` artifacts remain gitignored.
 
 ## Validation commands

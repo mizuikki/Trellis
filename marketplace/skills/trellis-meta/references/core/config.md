@@ -76,8 +76,8 @@ packages:
   cli:
     path: packages/cli
     tags: [backend, unit-test]
-  docs-site:
-    path: docs-site
+  website:
+    path: website
     type: submodule
     tags: [docs]
 default_package: cli
@@ -161,8 +161,8 @@ packages:
   cli:
     path: packages/cli
     tags: [backend, unit-test]
-  docs-site:
-    path: docs-site
+  website:
+    path: website
     type: submodule
     tags: [docs]
 

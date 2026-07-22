@@ -556,7 +556,7 @@ def main() -> int:
     parser.add_argument("--commit", default="-", help="Comma-separated commit hashes")
     parser.add_argument("--summary", default="(Add summary)", help="Brief summary")
     parser.add_argument("--content-file", help="Path to file with detailed content")
-    parser.add_argument("--package", help="Package name tag (e.g., cli, docs-site)")
+    parser.add_argument("--package", help="Package name tag (e.g., cli, core)")
     parser.add_argument("--branch", help="Branch name (auto-detected if omitted)")
     parser.add_argument("--no-commit", action="store_true",
                         help="Skip auto-commit of workspace changes")

@@ -1,6 +1,6 @@
 # Internal Benchmark Harness (Trellis vs Vanilla)
 
-> **Internal-only.** Harness, prompts, transcripts, results, and reports live under `tmp/benchmark/` (gitignored). No public blog, no docs-site post, no GitHub artifacts. This task's planning artifacts (this PRD, design.md, implement.md) stay tracked by Trellis but the benchmark code/results never reach git or npm.
+> **Internal-only.** Harness, prompts, transcripts, results, and reports live under `tmp/benchmark/` (gitignored). No public blog, no external docs post, no GitHub artifacts. This task's planning artifacts (this PRD, design.md, implement.md) stay tracked by Trellis but the benchmark code/results never reach git or npm.
 
 ## Goal
 
@@ -20,7 +20,7 @@ We need real signal on where Trellis wins, where it ties, and where it loses, so
 - Followups list piped back as new Trellis tasks where wins or losses are actionable.
 
 **Out of scope (explicit)**
-- Public blog / docs-site / npm README / GitHub post — anything user-facing.
+- Public blog / external docs / npm README / GitHub post — anything user-facing.
 - Anything that touches `git add` (entire `tmp/` is gitignored; verify).
 - Multi-agent / channel benchmarks (too many failure modes for v1).
 - `trellis mem` recall benchmark (synthetic history, easy to game).
@@ -83,7 +83,6 @@ Judging: LLM judge with published rubric + human spot-check on 20% of runs.
 | Single-run variance | n ≥ 5 per (commit, arm); report variance not point estimates. |
 | Author-judging bias | LLM judge with published rubric + human spot-check 20%. |
 | Commit-message prompt leakage | Frozen worktree at parent SHA, prompts derived from rewritten PR text. |
-| GitNexus / index reflects post-fix state | Rebuild index at parent SHA inside the frozen harness. |
 | Token-spend confound | Report tokens; don't penalize C for higher spend unless quality is equal. |
 | Self-deception ("we won") | Pre-commit to filing every loss/tie as a follow-up task before reading aggregate results. |
 
