@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cli/backend/migrations.md","reason":"Fork boundary version must preserve migration ordering, migration gates, and user-file safety."}
+{"file":".trellis/spec/cli/backend/commands-update.md","reason":"The update command owns project-versus-CLI comparison and migration application."}
+{"file":".trellis/spec/cli/backend/commands-upgrade.md","reason":"Existing npm self-upgrade behavior is being removed from the source-only fork."}
+{"file":".trellis/spec/cli/backend/release-process.md","reason":"Release tooling and public npm publishing assumptions change."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Focused tests must follow local Vitest isolation conventions."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Consumer upgrade coverage requires temporary-directory command integration tests."}
+{"file":".trellis/spec/guides/cross-platform-thinking-guide.md","reason":"Generated Python session scripts and source-oriented commands must remain cross-platform."}
