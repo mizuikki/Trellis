@@ -144,8 +144,8 @@ These checkboxes track **scheme document completeness**, not product ship readin
 - [x] prd: requirements, AC, and decided CLI/sentinel/path/exit/source/Marketplace contracts
 - [x] design: mandatory sentinel §3.7, Marketplace ownership §3.10, safe CLI contract, D/I split, ID policy, overwrite/exit rules
 - [x] implement: exact-path matrix, prerequisite gate, validation, single scaffold source, no open product behavior
-- [ ] Product implementation: open formal Trellis task when ready to code
-- [ ] Product jsonl: curate on sub-agent platforms during real implement
+- [x] Product implementation: open formal Trellis task when ready to code
+- [x] Product jsonl: N/A; this implementation was explicitly single-agent
 
 ## Explicit non-goals
 
