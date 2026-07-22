@@ -22,20 +22,23 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 
 ## Step 3: Decide Where You Are
 
-`get_context.py` shows the active task's `status` field. Route by `status` + artifact presence:
+`get_context.py` shows the active task's `status` field. Route by `status` + artifact readiness. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
-- `status=planning` + `prd.md` exists + `implement.jsonl` not curated (only the seed `_example` row) → **1.3**
-- `status=planning` + `prd.md` + curated `implement.jsonl` → **1.4** (run `task.py start` to enter Phase 2)
+- `status=planning` + any present `design.md` / `implement.md` path is non-regular (including a symlink), unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines → **1.1**. It is artifact-pending, not complete; fill and review Core and triggered semantics before removing that artifact's sentinel.
+- `status=planning` + lightweight task with `prd.md` complete → **1.4** review.
+- `status=planning` + complex task missing either `design.md` or `implement.md` → **1.1** and run `python3 ./.trellis/scripts/task.py scaffold <task> all`, then fill and review both artifacts.
+- `status=planning` + complex artifacts machine-ready and authoring-reviewed + sub-agent jsonl not curated (only the seed `_example` row) → **1.3**
+- `status=planning` + required artifacts machine-ready and authoring-reviewed + required jsonl curated or inline mode → **1.4** (ask for start review; only run `task.py start` after user confirms)
 - `status=in_progress` + implementation not started → **2.1**
 - `status=in_progress` + implementation done, not yet checked → **2.2**
-- `status=in_progress` + check passed → **3.1**
+- `status=in_progress` + check passed → **3.3** (spec update) → **3.4** (commit)
 - `status=completed` (rare; usually archived immediately) → archive flow
 
 Phase rules (full detail in `.trellis/workflow.md`):
 
 1. Run steps **in order** within a phase — `[required]` steps must not be skipped
-2. `[once]` steps are already done if the output exists (e.g., `prd.md` for 1.1; `implement.jsonl` with curated entries for 1.3) — skip them
+2. `[once]` steps are already done only when their output is ready, not merely present. `prd.md` alone can be enough only for lightweight tasks; complex tasks also need machine-ready, authoring-reviewed `design.md` and `implement.md`. Do not lint H2 names.
 3. You may go back to an earlier phase if discoveries require it
 
 ## Step 4: Load the Specific Step

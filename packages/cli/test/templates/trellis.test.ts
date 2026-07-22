@@ -14,6 +14,7 @@ import {
   commonGitContext,
   commonTaskQueue,
   commonTaskUtils,
+  commonTaskArtifacts,
   commonActiveTask,
   commonCliAdapter,
   getDeveloperScript,
@@ -42,6 +43,7 @@ describe("trellis template constants", () => {
     commonGitContext,
     commonTaskQueue,
     commonTaskUtils,
+    commonTaskArtifacts,
     commonActiveTask,
     commonCliAdapter,
     getDeveloperScript,
@@ -101,6 +103,67 @@ describe("trellis template constants", () => {
     for (const [name, content] of Object.entries(allTemplates)) {
       expect(content.length, `${name} should be non-empty`).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps canonical artifact bodies in the scaffold module and Semantic IDs aligned", () => {
+    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
+      ? process.cwd()
+      : path.resolve(process.cwd(), "../..");
+    const sourceConsumers = [
+      "packages/cli/src/templates/common/skills/brainstorm.md",
+      "packages/cli/src/templates/codex/skills/brainstorm/SKILL.md",
+      "packages/cli/src/templates/copilot/prompts/brainstorm.prompt.md",
+    ];
+    const trackedConsumers = [
+      ".agents/skills/trellis-brainstorm/SKILL.md",
+      ".claude/skills/trellis-brainstorm/SKILL.md",
+      ".cursor/skills/trellis-brainstorm/SKILL.md",
+      ".omp/skills/trellis-brainstorm/SKILL.md",
+      ".opencode/skills/trellis-brainstorm/SKILL.md",
+      ".pi/skills/trellis-brainstorm/SKILL.md",
+    ];
+    const semanticIds = [
+      "D-BOUND", "D-MECH", "D-RISK", "I-STEPS", "I-VAL", "I-ROLL", "I-EXIT",
+    ];
+
+    for (const relativePath of [...sourceConsumers, ...trackedConsumers]) {
+      const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
+      for (const id of semanticIds) expect(content).toContain(id);
+      expect(content).toContain("scaffold-unfilled");
+      expect(content).toContain("non-regular");
+    }
+    for (const relativePath of sourceConsumers) {
+      const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
+      expect(content).not.toContain("# Design -");
+      expect(content).not.toContain("# Implement -");
+    }
+    expect(commonTaskArtifacts).toContain('SCAFFOLD_SENTINEL = "<!-- trellis:scaffold-unfilled -->"');
+    expect(commonTaskArtifacts).toContain("def _default_design_content");
+    expect(commonTaskArtifacts).toContain("def _default_implement_content");
+  });
+
+  it("keeps new scaffold and guidance text free of CJK ideographs without parsing user headings", () => {
+    const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
+      ? process.cwd()
+      : path.resolve(process.cwd(), "../..");
+    const scopedTemplates = [
+      "packages/cli/src/templates/trellis/scripts/common/task_artifacts.py",
+      "packages/cli/src/templates/common/skills/brainstorm.md",
+      "packages/cli/src/templates/codex/skills/brainstorm/SKILL.md",
+      "packages/cli/src/templates/copilot/prompts/brainstorm.prompt.md",
+      "packages/cli/src/templates/common/commands/continue.md",
+    ];
+    for (const relativePath of scopedTemplates) {
+      const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf-8");
+      expect(content, relativePath).not.toMatch(/[\u3400-\u9fff]/);
+    }
+    const planningArtifacts = /### Planning Artifacts[\s\S]*?(?=\n### )/.exec(
+      workflowMdTemplate,
+    )?.[0];
+    expect(planningArtifacts).toBeDefined();
+    expect(planningArtifacts).not.toMatch(/[\u3400-\u9fff]/);
+    expect(commonTaskArtifacts).not.toContain("required_headings");
+    expect(commonTaskArtifacts).not.toContain("expected_h2");
   });
 
   it("Python scripts contain valid Python syntax indicators", () => {
@@ -343,6 +406,7 @@ describe("getAllScripts", () => {
     expect(scripts.has("common/__init__.py")).toBe(true);
     expect(scripts.has("common/paths.py")).toBe(true);
     expect(scripts.has("common/active_task.py")).toBe(true);
+    expect(scripts.has("common/task_artifacts.py")).toBe(true);
     expect(scripts.has("task.py")).toBe(true);
     expect(scripts.has("get_developer.py")).toBe(true);
   });
@@ -363,6 +427,7 @@ describe("getAllScripts", () => {
     const scripts = getAllScripts();
     expect(scripts.get("__init__.py")).toBe(scriptsInit);
     expect(scripts.get("common/__init__.py")).toBe(commonInit);
+    expect(scripts.get("common/task_artifacts.py")).toBe(commonTaskArtifacts);
     expect(scripts.get("task.py")).toBe(taskScript);
   });
 

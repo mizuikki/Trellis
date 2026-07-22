@@ -1,11 +1,13 @@
 /* global process */
-import { existsSync, readFileSync, readdirSync, statSync } from "fs"
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "fs"
 import { join } from "path"
 import { execFileSync } from "child_process"
 import { platform } from "os"
+import { TextDecoder } from "node:util"
 import { debugLog } from "./trellis-context.js"
 
 const PYTHON_CMD = platform() === "win32" ? "python" : "python3"
+const SCAFFOLD_SENTINEL = "<!-- trellis:scaffold-unfilled -->"
 
 const FIRST_REPLY_NOTICE = `<first-reply-notice>
 On the first visible assistant reply in this session, briefly acknowledge that Trellis SessionStart context loaded.
@@ -37,6 +39,22 @@ function hasCuratedJsonlEntry(jsonlPath) {
     return false
   }
   return false
+}
+
+function planningArtifactState(artifactPath) {
+  try {
+    const artifactStat = lstatSync(artifactPath)
+    if (artifactStat.isSymbolicLink() || !artifactStat.isFile()) return "invalid path"
+    const content = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(artifactPath))
+    if (!content.trim()) return "empty"
+    if (content.split(/\r?\n/).slice(0, 5).includes(SCAFFOLD_SENTINEL)) {
+      return "scaffold unfilled"
+    }
+    return "ready"
+  } catch (error) {
+    if (error && error.code === "ENOENT") return "missing"
+    return "unreadable or non-UTF-8"
+  }
 }
 
 function getTaskStatus(ctx, platformInput = null) {
@@ -75,10 +93,16 @@ function getTaskStatus(ctx, platformInput = null) {
   }
 
   const hasPrd = existsSync(join(taskDir, "prd.md"))
-  const hasDesign = existsSync(join(taskDir, "design.md"))
-  const hasImplementPlan = existsSync(join(taskDir, "implement.md"))
+  const planningStates = {
+    "design.md": planningArtifactState(join(taskDir, "design.md")),
+    "implement.md": planningArtifactState(join(taskDir, "implement.md")),
+  }
+  const hasDesign = planningStates["design.md"] !== "missing"
+  const hasImplementPlan = planningStates["implement.md"] !== "missing"
   const artifactNames = ["prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl"]
-  const present = artifactNames.filter(name => existsSync(join(taskDir, name)))
+  const present = artifactNames.filter(name =>
+    (planningStates[name] ?? "missing") !== "missing" || existsSync(join(taskDir, name))
+  )
   if (existsSync(join(taskDir, "research"))) present.push("research/")
   const presentLine = present.length > 0 ? present.join(", ") : "(none)"
   const implementJsonl = join(taskDir, "implement.jsonl")
@@ -92,16 +116,23 @@ function getTaskStatus(ctx, platformInput = null) {
   }
 
   if (taskStatus === "planning") {
+    const pendingArtifacts = Object.entries(planningStates)
+      .filter(([, state]) => !["missing", "ready"].includes(state))
+      .map(([name, state]) => `${name} (${state})`)
     const missingComplex = []
     if (!hasDesign) missingComplex.push("design.md")
     if (!hasImplementPlan) missingComplex.push("implement.md")
     const nextBits = []
-    if (missingComplex.length > 0) {
+    if (pendingArtifacts.length > 0) {
       nextBits.push(
-        `Lightweight task can request start review with PRD-only; complex task must add ${missingComplex.join(", ")} before start`,
+        `Artifact present but not ready: ${pendingArtifacts.join(", ")}; fill and review Core and triggered semantics before removing the sentinel`,
+      )
+    } else if (missingComplex.length > 0) {
+      nextBits.push(
+        `Lightweight task can request start review with PRD-only; complex task must scaffold and fill ${missingComplex.join(", ")} before start`,
       )
     } else {
-      nextBits.push("Planning artifacts are present; ask for review before `task.py start`")
+      nextBits.push("Planning artifacts are machine-ready; review Core and triggered semantics before `task.py start`")
     }
     if (!jsonlReady) {
       nextBits.push("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")

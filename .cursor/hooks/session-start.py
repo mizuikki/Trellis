@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shlex
+import stat
 import subprocess
 import sys
 from io import StringIO
@@ -118,6 +119,30 @@ def _has_curated_jsonl_entry(jsonl_path: Path) -> bool:
     except (OSError, UnicodeDecodeError):
         return False
     return False
+
+
+_SCAFFOLD_SENTINEL = "<!-- trellis:scaffold-unfilled -->"
+
+
+def _planning_artifact_state(path: Path) -> str:
+    """Return missing, ready, or a deterministic pending reason."""
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return "missing"
+    except OSError:
+        return "unreadable"
+    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+        return "invalid path"
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return "unreadable or non-UTF-8"
+    if not content.strip():
+        return "empty"
+    if _SCAFFOLD_SENTINEL in content.splitlines()[:5]:
+        return "scaffold unfilled"
+    return "ready"
 
 
 def should_skip_injection() -> bool:
@@ -352,7 +377,14 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
     task_title = task_data.get("title", task_ref)
     task_status = task_data.get("status", "unknown")
     artifact_names = ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
-    present = [name for name in artifact_names if (task_dir / name).is_file()]
+    planning_states = {
+        name: _planning_artifact_state(task_dir / name)
+        for name in ("design.md", "implement.md")
+    }
+    present = [
+        name for name in artifact_names
+        if planning_states.get(name, "missing") != "missing" or (task_dir / name).is_file()
+    ]
     if (task_dir / "research").is_dir():
         present.append("research/")
     present_line = ", ".join(present) if present else "(none)"
@@ -365,8 +397,8 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         )
 
     has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement_plan = (task_dir / "implement.md").is_file()
+    has_design = planning_states["design.md"] != "missing"
+    has_implement_plan = planning_states["implement.md"] != "missing"
     implement_jsonl = task_dir / "implement.jsonl"
     check_jsonl = task_dir / "check.jsonl"
     jsonl_ready = (
@@ -382,6 +414,11 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
         )
 
     if task_status == "planning":
+        pending_artifacts = [
+            f"{name} ({state})"
+            for name, state in planning_states.items()
+            if state not in ("missing", "ready")
+        ]
         missing_complex = [
             name for name, exists in (
                 ("design.md", has_design),
@@ -390,13 +427,18 @@ def _get_task_status(trellis_dir: Path, input_data: dict) -> str:
             if not exists
         ]
         next_bits: list[str] = []
-        if missing_complex:
+        if pending_artifacts:
+            next_bits.append(
+                "Artifact present but not ready: "
+                f"{', '.join(pending_artifacts)}; fill and review Core and triggered semantics before removing the sentinel"
+            )
+        elif missing_complex:
             next_bits.append(
                 "Lightweight task can request start review with PRD-only; "
-                f"complex task must add {', '.join(missing_complex)} before start"
+                f"complex task must scaffold and fill {', '.join(missing_complex)} before start"
             )
         else:
-            next_bits.append("Planning artifacts are present; ask for review before `task.py start`")
+            next_bits.append("Planning artifacts are machine-ready; review Core and triggered semantics before `task.py start`")
         if not jsonl_ready:
             next_bits.append("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")
         return (

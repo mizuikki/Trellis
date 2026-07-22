@@ -169,6 +169,16 @@ Lightweight tasks may have only `prd.md`. Complex tasks must have `prd.md`, `des
 
 `implement.md` is not a replacement for `implement.jsonl`. Use JSONL files only for manifest-style spec and research references when the task needs them.
 
+### Complex Artifact Authoring
+
+For missing complex artifacts, run `python3 ./.trellis/scripts/task.py scaffold <task> all`. A scaffold is a prompt, not planning-ready. A present `design.md` or `implement.md` is pending when it is non-regular or a symlink, unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines.
+
+Review design Core labels D-BOUND (boundary), D-MECH (mechanisms and decisions), and D-RISK (compatibility, failure modes, rollback strategy). D-FLOW is required for non-trivial runtime/state/data flow and D-CONTRACT for cross-component APIs, events, files, or persistence; D-OVERVIEW, D-ALT, D-TEST, and D-HANDOFF are optional when useful.
+
+Review implement Core labels I-STEPS (ordered work), I-VAL (reproducible verification), I-ROLL (concrete rollback actions, or N/A with reason), and I-EXIT (task-specific gates). D-RISK is strategy while I-ROLL is execution; D-TEST is coverage intent while I-VAL is reproducible validation. I-LOG, I-MULTI, I-NONGOAL, and I-PROGRESS are project-specific additions, not global defaults.
+
+Delete unused Optional sections; reject empty sections and pristine prompt-only scaffolds. Remove each sentinel only after that artifact's Core and triggered semantics pass review. These labels are internal review vocabulary, not runtime schema or permanent user-document requirements; do not lint H2 names. Task `design.md` is technical planning, not a UI or brand `DESIGN.md`.
+
 ## PRD Convergence Pass
 
 Before declaring planning ready or running `task.py start`, rewrite `prd.md` once against the final structure described in the artifact rules above. This is not optional cleanup; it is the final planning gate.

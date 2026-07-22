@@ -10,6 +10,7 @@ import {
 } from "../../src/configurators/shared.js";
 import { AI_TOOLS } from "../../src/types/ai-tools.js";
 import type { TemplateContext } from "../../src/types/ai-tools.js";
+import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -146,6 +147,29 @@ describe("getPythonCommandForPlatform", () => {
   it("returns python3 on macOS and Linux", () => {
     expect(getPythonCommandForPlatform("darwin")).toBe("python3");
     expect(getPythonCommandForPlatform("linux")).toBe("python3");
+  });
+});
+
+describe("scaffold guidance Python rendering", () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform });
+  });
+
+  it("uses a platform-aware literal scaffold command for each platform", () => {
+    const command = "python3 ./.trellis/scripts/task.py scaffold <task> all";
+    expect(workflowMdTemplate).toContain(command);
+
+    Object.defineProperty(process, "platform", { value: "win32" });
+    expect(replacePythonCommandLiterals(command)).toBe(
+      "python ./.trellis/scripts/task.py scaffold <task> all",
+    );
+
+    Object.defineProperty(process, "platform", { value: "linux" });
+    expect(replacePythonCommandLiterals(command)).toBe(
+      "python3 ./.trellis/scripts/task.py scaffold <task> all",
+    );
   });
 });
 

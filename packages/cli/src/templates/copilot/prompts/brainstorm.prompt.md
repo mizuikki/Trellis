@@ -106,22 +106,54 @@ The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Cr
 - out of scope
 - open questions that still block planning
 
-`design.md` records technical design for complex tasks:
+Lightweight tasks may remain PRD-only. Complex tasks require technical design or an ordered multi-step execution plan; they must have `prd.md`, `design.md`, and `implement.md`. If either complex artifact is missing, run:
 
-- architecture and boundaries
-- data flow and contracts
-- compatibility and migration notes
-- important trade-offs
-- operational or rollback considerations
+```bash
+{{PYTHON_CMD}} ./.trellis/scripts/task.py scaffold <task> all
+```
 
-`implement.md` records execution planning for complex tasks:
+The scaffold is a prompt, not completed planning. An artifact is not ready when its path is non-regular or a symlink, unreadable or non-UTF-8, empty, or still has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines.
 
-- ordered implementation checklist
-- validation commands
-- risky files or rollback points
-- follow-up checks before `task.py start`
+### Technical `design.md`
 
-Lightweight tasks may have only `prd.md`. Complex tasks must have `prd.md`, `design.md`, and `implement.md` before `task.py start`.
+Core questions for every complex task:
+
+| ID | Required answer |
+|----|-----------------|
+| D-BOUND | What changes, what does not, and where are the boundaries? |
+| D-MECH | What mechanisms and technical decisions implement the behavior, and why? |
+| D-RISK | What compatibility, migration, failure-mode, and rollback-strategy decisions apply? |
+
+Triggered or optional questions:
+
+| ID | Rule |
+|----|------|
+| D-OVERVIEW | Optional orientation for multiple subsystems. |
+| D-FLOW | Required for non-trivial runtime, state, or data flow. |
+| D-CONTRACT | Required for cross-component API, event, file, or persistence contracts. |
+| D-ALT | Optional when real alternatives affected the decision. |
+| D-TEST | Optional verification strategy and coverage intent, not shell recipes. |
+| D-HANDOFF | Optional decision freeze when implementation must preserve several conclusions. |
+
+### Execution `implement.md`
+
+| ID | Required answer |
+|----|-----------------|
+| I-STEPS | What is the ordered, checkable work? |
+| I-VAL | How can another agent reproduce verification, including pass criteria? |
+| I-ROLL | What concrete rollback steps, checkpoints, files, or commands apply? Use N/A only with a reason. |
+| I-EXIT | What task-specific blockers and entry/exit criteria apply? Reference global workflow gates instead of copying them. |
+
+Project-specific plans may add I-LOG, I-MULTI, I-NONGOAL, or I-PROGRESS when useful; they are not global defaults. D-RISK owns rollback strategy while I-ROLL owns concrete rollback actions. D-TEST owns design-level coverage intent while I-VAL owns reproducible checks. `implement.md` references design decisions instead of duplicating them.
+
+### Authoring Review
+
+- Delete unused Optional sections instead of leaving TBD placeholders.
+- Reject empty sections and pristine prompt-only scaffolds as planning-ready.
+- Do not lint or require fixed H2 names. The IDs above are internal review labels, not runtime schema or permanent user-document requirements.
+- Review Core and every applicable triggered question per artifact. Remove that artifact's sentinel only after it passes this review.
+- Feature/foundation work often triggers D-FLOW and D-CONTRACT; remediation may be shorter but needs precise boundaries and regression points; audit/recon work should define its evidence standard and state model.
+- Task `design.md` is technical planning. A UI or brand `DESIGN.md` is a separate visual-system artifact.
 
 `implement.md` is not a replacement for `implement.jsonl`. On sub-agent-dispatch workflows, `implement.jsonl` and `check.jsonl` must each contain at least one real spec/research entry before `task.py start`; the seed `_example` row does not count. Inline workflows skip this JSONL gate because Phase 2 loads context through `trellis-before-dev`.
 
