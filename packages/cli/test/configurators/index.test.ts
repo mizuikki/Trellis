@@ -322,6 +322,7 @@ describe("collectPlatformTemplates", () => {
     // with Codex/Gemini) instead of a private `.pi/skills/` copy (#447).
     pi: ".agents/skills",
     zcode: ".zcode/skills",
+    kimi: ".agents/skills",
   };
 
   it("does not throw for any platform", () => {

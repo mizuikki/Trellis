@@ -251,7 +251,10 @@ Selectively adapted upstream v0.6.8 Kimi Code support, corrected the non-interac
 
 ### Testing
 
-- Validation was not recorded for this session.
+- Passed the focused Kimi test suite and built-CLI init/update smoke tests.
+- Passed `pnpm lint`, `pnpm typecheck`, `pnpm build`, and the full `pnpm test`
+  suite.
+- Verified canonical/generated twins and fork version/topology invariants.
 
 ### Status
 

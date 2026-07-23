@@ -210,8 +210,12 @@ describe("trellis template constants", () => {
         "class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok",
       )
       .replace(
-        " On Kimi Code, dispatch the built-in `coder` / `explore` sub-agent with the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions.",
+        " On Kimi Code, dispatch `trellis-research` to the built-in `explore` sub-agent, and dispatch `trellis-implement` / `trellis-check` to the built-in `coder` sub-agent; include the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions in the prompt.",
         "",
+      )
+      .replace(
+        "Tools: `trellis-implement` / `trellis-research` are Trellis sub-agent roles, not user-invocable workflow skills. On Kimi Code, the matching `.kimi-code/skills/trellis-<role>/SKILL.md` files contain role instructions for built-in sub-agents; they do not define custom sub-agent types. `trellis-update-spec` is a user-invocable skill. `trellis-check` exists as both a workflow skill and sub-agent role; prefer the agent form when verifying after code changes.",
+        "Tools: `trellis-implement` / `trellis-research` are sub-agent types only (Task/Agent tool, NOT Skill; there is no skill by these names). `trellis-update-spec` is a skill. `trellis-check` exists as both; prefer the Agent form when verifying after code changes.",
       )
       .replaceAll(", Kimi Code]", "]");
     expect(marketplaceNative).toBe(expectedMarketplaceNative);

@@ -69,8 +69,21 @@ test "$(node -p "require('./packages/cli/package.json').name")" = "@mizuikki/tre
 test "$(node -p "require('./packages/cli/package.json').version")" = "1.0.0"
 test "$(node -p "require('./packages/core/package.json').name")" = "@mizuikki/trellis-core"
 test "$(node -p "require('./packages/core/package.json').version")" = "1.0.0"
-test -z "$(git diff --name-only -- packages/cli/src/migrations/manifests/0.6.8.json)"
-test -z "$(git status --short | grep 'marketplace~' || true)"
+test -z "$(
+  {
+    git diff --name-only origin/main...HEAD -- packages/cli/src/migrations/manifests/0.6.8.json
+    git diff --cached --name-only -- packages/cli/src/migrations/manifests/0.6.8.json
+    git diff --name-only -- packages/cli/src/migrations/manifests/0.6.8.json
+  }
+)"
+test -z "$(
+  {
+    git diff --name-only origin/main...HEAD
+    git diff --cached --name-only
+    git diff --name-only
+    git ls-files --others --exclude-standard
+  } | grep 'marketplace~' || true
+)"
 test -z "$(git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!pnpm-lock.yaml' || true)"
 ```
 
