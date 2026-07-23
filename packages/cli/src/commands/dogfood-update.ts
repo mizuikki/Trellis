@@ -21,7 +21,12 @@ const SOURCE_DEPENDENCY_PATHS = [
   "packages/core/node_modules",
   "packages/cli/node_modules",
 ] as const;
-const SOURCE_VALIDATION_SCRIPTS = ["lint", "typecheck", "test"] as const;
+const SOURCE_VALIDATION_SCRIPTS = [
+  "lint",
+  "typecheck",
+  "build",
+  "test",
+] as const;
 const RUNTIME_MANIFEST_PREFIXES = [
   ".codex/sessions/",
   ".trellis/tasks/",

@@ -24,7 +24,7 @@ describe("dogfoodUpdate", () => {
 
     runSourceQualityGates("/source", (_cwd, script) => scripts.push(script));
 
-    expect(scripts).toEqual(["lint", "typecheck", "test"]);
+    expect(scripts).toEqual(["lint", "typecheck", "build", "test"]);
   });
 
   it("rejects a preview when a source quality gate fails", () => {
