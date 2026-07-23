@@ -55,11 +55,16 @@ import {
   update,
   classifyMigrations,
   executeMigrations,
+  getTrellisSourceRoot,
+  UpdateCommandError,
 } from "../../src/commands/update.js";
 import { VERSION } from "../../src/constants/version.js";
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../../src/constants/paths.js";
 import { computeHash } from "../../src/utils/template-hash.js";
-import { workflowMdTemplate } from "../../src/templates/trellis/index.js";
+import {
+  getAllScripts,
+  workflowMdTemplate,
+} from "../../src/templates/trellis/index.js";
 import {
   COPILOT_INSTRUCTIONS_BLOCK_END,
   COPILOT_INSTRUCTIONS_BLOCK_START,
@@ -470,6 +475,33 @@ describe("update() integration", () => {
     ).toBe(neutralContent);
   });
 
+  it("preserves an approved migration target while retiring its legacy directory", async () => {
+    await setupProject();
+    writeProjectFile(".pi/skills/legacy/SKILL.md", "legacy Pi copy\n");
+    writeProjectFile(
+      ".agents/skills/source-only/SKILL.md",
+      "source checkout skill\n",
+    );
+    const migrationItem = {
+      type: "rename-dir" as const,
+      from: ".pi/skills",
+      to: ".agents/skills",
+    };
+
+    await executeMigrations(
+      { auto: [migrationItem], confirm: [], conflict: [], skip: [] },
+      tmpDir,
+      { preserveExistingMigrationTargets: true },
+      new Map(),
+      readHashesV2(hashFilePath()),
+    );
+
+    expect(fs.existsSync(projectFile(".pi/skills"))).toBe(false);
+    expect(readProjectFile(".agents/skills/source-only/SKILL.md")).toBe(
+      "source checkout skill\n",
+    );
+  });
+
   it("#2 dry run makes no file changes even when changes exist", async () => {
     await setupProject();
 
@@ -494,6 +526,60 @@ describe("update() integration", () => {
     // No backup directory created
     const entries = fs.readdirSync(path.join(tmpDir, DIR_NAMES.WORKFLOW));
     expect(entries.filter((e) => e.startsWith(".backup-")).length).toBe(0);
+  });
+
+  it("#2b dry run reports manifest pruning without rewriting the manifest", async () => {
+    await setupProject();
+
+    const hashFile = hashFilePath();
+    const hashes = readHashesV2(hashFile);
+    hashes[".codex/sessions/runtime.json"] = "poisoned-runtime-entry";
+    writeHashesV2(hashFile, hashes);
+    const before = fs.readFileSync(hashFile, "utf-8");
+
+    await update({ dryRun: true });
+
+    expect(fs.readFileSync(hashFile, "utf-8")).toBe(before);
+  });
+
+  it("#2c fails before writes when an internal caller disallows conflicts", async () => {
+    await setupProject();
+    fs.writeFileSync(projectFile(MANAGED_FILE), "user customization\n");
+    const versionBefore = fs.readFileSync(versionFilePath(), "utf-8");
+
+    const result = await update({ failOnConflicts: true });
+
+    expect(result).toEqual({
+      status: "conflict",
+      conflicts: [
+        { kind: "modified-template", paths: [MANAGED_FILE] },
+      ],
+    });
+    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(versionBefore);
+    const entries = fs.readdirSync(path.join(tmpDir, DIR_NAMES.WORKFLOW));
+    expect(entries.filter((entry) => entry.startsWith(".backup-")).length).toBe(0);
+  });
+
+  it("#2d rejects a direct update in the executing CLI source checkout", async () => {
+    const sourceRoot = getTrellisSourceRoot();
+    vi.mocked(process.cwd).mockReturnValue(sourceRoot);
+
+    await expect(update({})).rejects.toMatchObject({
+      code: "source-root-update",
+    } satisfies Partial<UpdateCommandError>);
+  });
+
+  it("#2e lets an approved self-hosted caller replace committed managed files", async () => {
+    await setupProject();
+    fs.writeFileSync(projectFile(MANAGED_FILE), "source checkout customization\n");
+    vi.mocked(inquirer.prompt).mockClear();
+
+    await update({ overwriteManagedFiles: true });
+
+    expect(readProjectFile(MANAGED_FILE)).toBe(
+      getAllScripts().get("get_context.py"),
+    );
+    expect(inquirer.prompt).not.toHaveBeenCalled();
   });
 
   it("#3 user-deleted file (with stored hash) is not re-added on update", async () => {
@@ -1347,17 +1433,13 @@ describe("update() integration", () => {
     });
   }
 
-  it("#22 breaking-change gate exits 1 when --migrate is missing", async () => {
+  it("#22 breaking-change gate raises a typed error when --migrate is missing", async () => {
     await setupProject();
     stageLegacy040Project();
 
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(() => undefined as never);
-
-    await update({});
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    await expect(update({})).rejects.toMatchObject({
+      code: "migration-required",
+    } satisfies Partial<UpdateCommandError>);
   });
 
   it("#23 breaking-change gate allows --dry-run without --migrate", async () => {

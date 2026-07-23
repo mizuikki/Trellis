@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import inquirer from "inquirer";
 
@@ -79,6 +80,57 @@ export interface UpdateOptions {
   createNew?: boolean;
   allowDowngrade?: boolean;
   migrate?: boolean;
+  /** Abort before writes when managed-file or migration decisions are needed. */
+  failOnConflicts?: boolean;
+  /** Internal caller control for update flows that must not create tasks. */
+  suppressMigrationTask?: boolean;
+  /**
+   * Internal self-hosted mode: a clean source checkout has already approved
+   * replacement of its committed managed deployment files through patch review.
+   */
+  overwriteManagedFiles?: boolean;
+  /** Keep an existing target directory when an approved migration retires its legacy source. */
+  preserveExistingMigrationTargets?: boolean;
+}
+
+export type UpdateConflictKind =
+  | "modified-template"
+  | "migration-confirmation"
+  | "migration-conflict";
+
+export interface UpdateConflict {
+  kind: UpdateConflictKind;
+  paths: string[];
+}
+
+export interface UpdateResult {
+  status: "updated" | "noop" | "dry-run" | "cancelled" | "conflict";
+  conflicts?: UpdateConflict[];
+}
+
+export class UpdateCommandError extends Error {
+  constructor(
+    public readonly code: "source-root-update" | "migration-required",
+    message: string,
+  ) {
+    super(message);
+    this.name = "UpdateCommandError";
+  }
+}
+
+/** Source checkout root for the CLI module currently executing. */
+export function getTrellisSourceRoot(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const packageRoot = path.resolve(moduleDir, "../..");
+  return path.resolve(packageRoot, "../..");
+}
+
+function samePath(left: string, right: string): boolean {
+  try {
+    return fs.realpathSync(left) === fs.realpathSync(right);
+  } catch {
+    return path.resolve(left) === path.resolve(right);
+  }
 }
 
 interface FileChange {
@@ -1125,6 +1177,9 @@ async function promptConflictResolution(
   if (options.force) {
     return "overwrite";
   }
+  if (options.overwriteManagedFiles) {
+    return "overwrite";
+  }
   if (options.skipAll) {
     return "skip";
   }
@@ -1170,6 +1225,20 @@ async function promptConflictResolution(
   }
 
   return action as ConflictAction;
+}
+
+function approveMigrationConflicts(
+  classified: ClassifiedMigrations,
+): ClassifiedMigrations {
+  if (classified.conflict.length === 0) {
+    return classified;
+  }
+  return {
+    auto: [...classified.auto, ...classified.conflict],
+    confirm: classified.confirm,
+    conflict: [],
+    skip: classified.skip,
+  };
 }
 
 /**
@@ -1806,7 +1875,11 @@ export function sortMigrationsForExecution(
 export async function executeMigrations(
   classified: ClassifiedMigrations,
   cwd: string,
-  options: { force?: boolean; skipAll?: boolean },
+  options: {
+    force?: boolean;
+    skipAll?: boolean;
+    preserveExistingMigrationTargets?: boolean;
+  },
   templates: Map<string, string>,
   hashes?: TemplateHashes,
 ): Promise<MigrationResult> {
@@ -1856,7 +1929,8 @@ export async function executeMigrations(
       // flavored bytes, so just drop the now-redundant source instead (#447).
       if (
         fs.existsSync(newPath) &&
-        dirMatchesCurrentTemplates(cwd, item.to, templates)
+        (options.preserveExistingMigrationTargets ||
+          dirMatchesCurrentTemplates(cwd, item.to, templates))
       ) {
         removeDirectoryRecursive(oldPath);
 
@@ -2058,14 +2132,21 @@ export function renameTracesToJournal(workspaceDir: string): {
 /**
  * Main update command
  */
-export async function update(options: UpdateOptions): Promise<void> {
+export async function update(options: UpdateOptions): Promise<UpdateResult> {
   const cwd = process.cwd();
+
+  if (samePath(cwd, getTrellisSourceRoot())) {
+    throw new UpdateCommandError(
+      "source-root-update",
+      "Direct updates in the Trellis source checkout are disabled. Run 'trellis dogfood-update --migrate' to create a reviewed self-hosted upgrade patch.",
+    );
+  }
 
   // Check if Trellis is initialized
   if (!fs.existsSync(path.join(cwd, DIR_NAMES.WORKFLOW))) {
     console.log(chalk.red("Error: Trellis not initialized in this directory."));
     console.log(chalk.gray("Run 'trellis init' first."));
-    return;
+    return { status: "noop" };
   }
 
   console.log(chalk.cyan("\nTrellis Update"));
@@ -2102,7 +2183,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       console.log(
         chalk.gray(`  2. Force downgrade: trellis update --allow-downgrade\n`),
       );
-      return;
+      return { status: "noop" };
     }
 
     console.log(
@@ -2162,6 +2243,7 @@ export async function update(options: UpdateOptions): Promise<void> {
       cwd,
       [...configuredPlatforms],
       hashes,
+      { persist: !options.dryRun },
     );
     if (prune.pruned.length > 0) {
       console.log(
@@ -2265,6 +2347,9 @@ export async function update(options: UpdateOptions): Promise<void> {
       migrationHashes,
       templates,
     );
+    if (options.overwriteManagedFiles) {
+      classifiedMigrations = approveMigrationConflicts(classifiedMigrations);
+    }
 
     printMigrationSummary(classifiedMigrations);
 
@@ -2302,7 +2387,10 @@ export async function update(options: UpdateOptions): Promise<void> {
               "  Use --dry-run to preview what --migrate will do.",
           ),
         );
-        process.exit(1);
+        throw new UpdateCommandError(
+          "migration-required",
+          `Breaking changes between ${projectVersion} and ${cliVersion} require --migrate.`,
+        );
       }
     }
 
@@ -2341,6 +2429,34 @@ export async function update(options: UpdateOptions): Promise<void> {
     changes,
     hashes,
   );
+
+  if (options.failOnConflicts) {
+    const conflicts: UpdateConflict[] = [];
+    if (changes.changedFiles.length > 0) {
+      conflicts.push({
+        kind: "modified-template",
+        paths: changes.changedFiles.map((file) => file.relativePath),
+      });
+    }
+    if (classifiedMigrations?.confirm.length) {
+      conflicts.push({
+        kind: "migration-confirmation",
+        paths: classifiedMigrations.confirm.map((item) => item.from),
+      });
+    }
+    if (classifiedMigrations?.conflict.length) {
+      conflicts.push({
+        kind: "migration-conflict",
+        paths: classifiedMigrations.conflict.map((item) => item.from),
+      });
+    }
+    if (conflicts.length > 0) {
+      console.log(
+        chalk.red("Update stopped: manual conflict resolution is required."),
+      );
+      return { status: "conflict", conflicts };
+    }
+  }
 
   // Print summary
   printChangeSummary(changes);
@@ -2402,7 +2518,7 @@ export async function update(options: UpdateOptions): Promise<void> {
         );
       }
     }
-    return;
+    return { status: "noop" };
   }
 
   // Show what this operation will do
@@ -2471,12 +2587,17 @@ export async function update(options: UpdateOptions): Promise<void> {
   // Dry run mode
   if (options.dryRun) {
     console.log(chalk.gray("[Dry run] No changes made."));
-    return;
+    return { status: "dry-run" };
   }
 
   // Batch-resolution flags are explicit consent for non-interactive runs.
   // Prompting here breaks CI and `node ... update --force --migrate` smoke tests.
-  if (!options.force && !options.skipAll && !options.createNew) {
+  if (
+    !options.force &&
+    !options.skipAll &&
+    !options.createNew &&
+    !options.overwriteManagedFiles
+  ) {
     const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
       {
         type: "confirm",
@@ -2488,7 +2609,7 @@ export async function update(options: UpdateOptions): Promise<void> {
 
     if (!proceed) {
       console.log(chalk.yellow("Update cancelled."));
-      return;
+      return { status: "cancelled" };
     }
   }
 
@@ -2507,8 +2628,10 @@ export async function update(options: UpdateOptions): Promise<void> {
       classifiedMigrations,
       cwd,
       {
-        force: options.force,
+        force: options.force === true || options.overwriteManagedFiles === true,
         skipAll: options.skipAll,
+        preserveExistingMigrationTargets:
+          options.preserveExistingMigrationTargets === true,
       },
       templates,
       migrationHashes,
@@ -2721,7 +2844,11 @@ export async function update(options: UpdateOptions): Promise<void> {
   }
 
   // Create migration task if there are breaking changes with migration guides
-  if (cliVsProject > 0 && projectVersion !== "unknown") {
+  if (
+    !options.suppressMigrationTask &&
+    cliVsProject > 0 &&
+    projectVersion !== "unknown"
+  ) {
     const metadata = getMigrationMetadata(projectVersion, cliVersion);
 
     if (metadata.breaking && metadata.migrationGuides.length > 0) {
@@ -2865,4 +2992,6 @@ export async function update(options: UpdateOptions): Promise<void> {
       console.log(chalk.cyan("═".repeat(60)));
     }
   }
+
+  return { status: "updated" };
 }

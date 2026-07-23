@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { init } from "../commands/init.js";
 import { update } from "../commands/update.js";
+import { dogfoodUpdate } from "../commands/dogfood-update.js";
 import { uninstall } from "../commands/uninstall.js";
 import { runMem } from "../commands/mem.js";
 import {
@@ -170,6 +171,33 @@ program
         createNew: options.createNew as boolean,
         allowDowngrade: options.allowDowngrade as boolean,
         migrate: options.migrate as boolean,
+      });
+    } catch (error) {
+      console.error(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : error,
+      );
+      if (process.env.DEBUG || process.env.TRELLIS_DEBUG) {
+        console.error(error instanceof Error ? error.stack : error);
+      }
+      process.exit(1);
+    }
+  });
+
+program
+  .command("dogfood-update")
+  .description(
+    "Preview or apply a reviewed self-hosted Trellis deployment upgrade",
+  )
+  .option("--migrate", "Create an isolated upgrade preview")
+  .option("--apply <preview-manifest>", "Apply a reviewed preview manifest")
+  .option("--keep-worktree", "Keep the isolated worktree for diagnostics")
+  .action(async (options: Record<string, unknown>) => {
+    try {
+      await dogfoodUpdate({
+        migrate: options.migrate as boolean,
+        apply: options.apply as string | undefined,
+        keepWorktree: options.keepWorktree as boolean,
       });
     } catch (error) {
       console.error(
