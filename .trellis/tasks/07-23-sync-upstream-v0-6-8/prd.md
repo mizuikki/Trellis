@@ -54,22 +54,22 @@ baseline.
 
 ## Acceptance Criteria
 
-- [ ] `trellis init --kimi` and update tracking produce the expected
+- [x] `trellis init --kimi` and update tracking produce the expected
   `.kimi-code/skills/` and neutral `.agents/skills/` files.
-- [ ] Kimi is recognized by the TypeScript and generated Python platform
+- [x] Kimi is recognized by the TypeScript and generated Python platform
   registries, task context seeding, detection, and CLI adapter paths.
-- [ ] The Kimi non-interactive command is exactly `kimi -p <prompt>` without
+- [x] The Kimi non-interactive command is exactly `kimi -p <prompt>` without
   `--yolo`, and resume is `kimi --session <id>`.
-- [ ] Kimi template/configurator output and live/canonical workflow/Python
+- [x] Kimi template/configurator output and live/canonical workflow/Python
   twins are byte-consistent and covered by focused tests.
-- [ ] CLI and Core remain named `@mizuikki/trellis` and
+- [x] CLI and Core remain named `@mizuikki/trellis` and
   `@mizuikki/trellis-core`, both versioned `1.0.0`.
-- [ ] Public publish/self-upgrade surfaces remain deleted; `docs-site` and
+- [x] Public publish/self-upgrade surfaces remain deleted; `docs-site` and
   `README_CN.md` remain absent; `marketplace/` remains a normal vendored
   directory; the historical `0.6.8` migration manifest remains unchanged.
-- [ ] `UPSTREAM_SYNC.md` records the evaluated `v0.6.8` boundary, accepted
+- [x] `UPSTREAM_SYNC.md` records the evaluated `v0.6.8` boundary, accepted
   Kimi import, excluded commits/surfaces, and compatibility impact.
-- [ ] No conflict markers or temporary merge paths remain, and lint,
+- [x] No conflict markers or temporary merge paths remain, and lint,
   type-check, build, focused tests, and the full test suite pass.
 
 ## Out of Scope

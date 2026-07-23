@@ -26,7 +26,8 @@ export type AITool =
   | "zcode"
   | "trae"
   | "omp"
-  | "grok";
+  | "grok"
+  | "kimi";
 
 /**
  * Template directory categories
@@ -51,7 +52,8 @@ export type TemplateDir =
   | "zcode"
   | "trae"
   | "omp"
-  | "grok";
+  | "grok"
+  | "kimi";
 
 /**
  * CLI flag names for platform selection (e.g., --claude, --cursor, --kilo, --kiro, --gemini, --antigravity)
@@ -76,7 +78,8 @@ export type CliFlag =
   | "zcode"
   | "trae"
   | "omp"
-  | "grok";
+  | "grok"
+  | "kimi";
 
 /**
  * Template context for placeholder resolution.
@@ -84,7 +87,13 @@ export type CliFlag =
  */
 export interface TemplateContext {
   /** Prefix for cross-referencing other commands/skills */
-  cmdRefPrefix: "/trellis:" | "/trellis-" | "$" | "/" | "/skill trellis-";
+  cmdRefPrefix:
+    | "/trellis:"
+    | "/trellis-"
+    | "$"
+    | "/"
+    | "/skill trellis-"
+    | "/skill:trellis-";
   /** Description of AI executor actions shown in role tables */
   executorAI:
     | "Bash scripts or Task calls"
@@ -504,6 +513,35 @@ export const AI_TOOLS: Record<AITool, AIToolConfig> = {
       agentCapable: true,
       hasHooks: false,
       cliFlag: "grok",
+    },
+  },
+  /**
+   * Kimi Code CLI - class-2 pull-based platform.
+   *
+   * Kimi reads project skills from `.kimi-code/skills/` and the shared
+   * `.agents/skills/` root. Shared workflow and bundled skills use neutral
+   * rendering, while Kimi entry points and Trellis role prompts remain under
+   * `.kimi-code/skills/`.
+   *
+   * Kimi has no project-level hooks or settings file Trellis may write and no
+   * project-level custom sub-agent definitions. Its built-in coder, explore,
+   * and plan sub-agents consume the role prompts as skills.
+   */
+  kimi: {
+    name: "Kimi Code",
+    templateDirs: ["common", "kimi"],
+    configDir: ".kimi-code",
+    supportsAgentSkills: true,
+    cliFlag: "kimi",
+    defaultChecked: false,
+    hasPythonHooks: false,
+    templateContext: {
+      cmdRefPrefix: "/skill:trellis-",
+      executorAI: "Bash scripts or Agent calls",
+      userActionLabel: "Slash commands",
+      agentCapable: true,
+      hasHooks: false,
+      cliFlag: "kimi",
     },
   },
 };

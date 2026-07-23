@@ -2,27 +2,27 @@
 
 ## Ordered Checklist
 
-- [ ] Use upstream `bfa7f99d` as the semantic source and adapt only its Kimi
+- [x] Use upstream `bfa7f99d` as the semantic source and adapt only its Kimi
   platform changes; do not merge tag `v0.6.8` or import excluded gitlinks,
   release files, package versions, or deleted surfaces.
-- [ ] Add Kimi to the TypeScript data/function registries, CLI option, init
+- [x] Add Kimi to the TypeScript data/function registries, CLI option, init
   option, configurator, template module, and Kimi-specific agent skill files.
-- [ ] Route shared workflow/bundled skills through neutral resolution and
+- [x] Route shared workflow/bundled skills through neutral resolution and
   Kimi-private command/role skills through `.kimi-code/skills/`; keep
   configure and collect outputs byte-identical.
-- [ ] Add Kimi to both copies of the generated Python runtime registries and
+- [x] Add Kimi to both copies of the generated Python runtime registries and
   adapters. Use `kimi -p <prompt>` for non-interactive execution and
   `kimi --session <id>` for resume.
-- [ ] Reconcile Kimi workflow and `trellis-meta` documentation into the fork's
+- [x] Reconcile Kimi workflow and `trellis-meta` documentation into the fork's
   canonical templates, then synchronize the tracked dogfood twins without
   replacing fork-specific lifecycle or namespace content.
-- [ ] Update focused README/spec wording and the supported-platform count;
+- [x] Update focused README/spec wording and the supported-platform count;
   keep `README_CN.md` deleted.
-- [ ] Record the accepted Kimi import and evaluated/excluded `v0.6.8` surfaces
+- [x] Record the accepted Kimi import and evaluated/excluded `v0.6.8` surfaces
   in `UPSTREAM_SYNC.md`.
-- [ ] Add or adapt upstream Kimi tests, including an exact regression assertion
+- [x] Add or adapt upstream Kimi tests, including an exact regression assertion
   that the run command omits the incompatible `--yolo` flag.
-- [ ] Inspect the final diff against the approved boundary and complete all
+- [x] Inspect the final diff against the approved boundary and complete all
   validation and structural checks below.
 
 ## Validation
