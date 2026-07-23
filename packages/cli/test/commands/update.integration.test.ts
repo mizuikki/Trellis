@@ -268,7 +268,7 @@ describe("update() integration", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("upgrades an upstream 0.6.x consumer into the fork line exactly once", async () => {
+  it("preserves a customized upstream rename-dir source when entering the fork line", async () => {
     // This is the layout produced by upstream 0.6.3-0.6.5 for ZCode. Version
     // 0.6.6 relocated these agents from `.zcode/cli/agents/` to
     // `.zcode/agents/`, so it exercises a real pending upstream migration
@@ -278,7 +278,7 @@ describe("update() integration", () => {
 
     const legacyAgentPath = ".zcode/cli/agents/trellis-implement.md";
     const migratedAgentPath = ".zcode/agents/trellis-implement.md";
-    const legacyAgentContent =
+    const upstreamAgentContent =
       "---\n" +
       "name: trellis-implement\n" +
       "description: Code implementation expert.\n" +
@@ -286,7 +286,9 @@ describe("update() integration", () => {
       "---\n\n" +
       "# Implement Agent\n\n" +
       "Legacy upstream ZCode agent definition.\n";
-    writeProjectFile(legacyAgentPath, legacyAgentContent);
+    const customizedAgentContent =
+      upstreamAgentContent + "\nCustom consumer instructions.\n";
+    writeProjectFile(legacyAgentPath, customizedAgentContent);
     fs.rmSync(path.dirname(projectFile(migratedAgentPath)), {
       recursive: true,
       force: true,
@@ -298,31 +300,24 @@ describe("update() integration", () => {
         hashes = removeHashEntry(hashes, hashPath) as Record<string, string>;
       }
     }
-    hashes[legacyAgentPath] = computeHash(legacyAgentContent);
+    hashes[legacyAgentPath] = computeHash(upstreamAgentContent);
     writeHashesV2(hashFilePath(), hashes);
 
-    await update({ migrate: true, force: true });
+    const prompt = vi.mocked(inquirer.prompt);
+    prompt.mockResolvedValueOnce({ proceed: true });
+    prompt.mockResolvedValueOnce({ action: "skip" });
+    await update({ migrate: true });
 
     expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(VERSION);
     expect(fs.existsSync(projectFile(legacyAgentPath))).toBe(false);
     expect(fs.existsSync(projectFile(migratedAgentPath))).toBe(true);
+    expect(readProjectFile(migratedAgentPath)).toBe(customizedAgentContent);
     expect(readHashesV2(hashFilePath())[legacyAgentPath]).toBeUndefined();
     expect(readHashesV2(hashFilePath())[migratedAgentPath]).toBe(
-      computeHash(readProjectFile(migratedAgentPath)),
+      computeHash(upstreamAgentContent),
     );
-
-    const updatedVersion = fs.readFileSync(versionFilePath(), "utf-8");
-    const updatedAgent = readProjectFile(migratedAgentPath);
-    const updatedHashes = fs.readFileSync(hashFilePath(), "utf-8");
-    vi.mocked(console.log).mockClear();
-    await update({ migrate: true, force: true });
-    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(updatedVersion);
-    expect(readProjectFile(migratedAgentPath)).toBe(updatedAgent);
-    expect(fs.readFileSync(hashFilePath(), "utf-8")).toBe(updatedHashes);
-    expect(fs.existsSync(projectFile(legacyAgentPath))).toBe(false);
-    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain(
-      "Migration complete:",
-    );
+    expect(prompt).toHaveBeenCalledTimes(2);
+    expect(prompt.mock.calls[1]?.[0][0]?.message).toContain(migratedAgentPath);
   });
 
   it("#1b current OpenCode templates are not classified as deprecated", async () => {

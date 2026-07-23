@@ -26,7 +26,7 @@
 <a href="https://github.com/mizuikki/Trellis/issues"><img src="https://img.shields.io/github/issues/mizuikki/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
 <a href="https://github.com/mizuikki/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mizuikki/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
 <a href="https://deepwiki.com/mizuikki/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
-<a href="https://chatgpt.com/?q=Explain+the+project+mindfold-ai/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
+<a href="https://chatgpt.com/?q=Explain+the+project+mizuikki/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
 </p>
 
 <p align="center">
@@ -131,7 +131,7 @@ Yes. Personal workspace journals stay separate per developer, while shared specs
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=mindfold-ai/Trellis&type=Date)](https://star-history.com/#mindfold-ai/Trellis&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=mizuikki/Trellis&type=Date)](https://star-history.com/#mizuikki/Trellis&Date)
 
 ## Community & Resources
 
@@ -143,5 +143,5 @@ Yes. Personal workspace journals stay separate per developer, while shared specs
 <p align="center">
 <a href="https://github.com/mizuikki/Trellis">Repository</a> •
 <a href="https://github.com/mizuikki/Trellis/blob/main/LICENSE">AGPL-3.0 License</a> •
-Built by <a href="https://github.com/mindfold-ai">Mindfold</a>
+Fork maintained by <a href="https://github.com/mizuikki">mizuikki</a>, based on Trellis by <a href="https://github.com/mindfold-ai">Mindfold</a>
 </p>

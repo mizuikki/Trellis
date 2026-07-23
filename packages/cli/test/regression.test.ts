@@ -1175,11 +1175,21 @@ describe("regression: SessionStart reinject on clear/compact (MIN-231)", () => {
 });
 
 describe("regression: source-managed session context", () => {
-  it("does not probe PATH or write an update marker", () => {
-    expect(commonSessionContext).not.toContain('"trellis", "--version"');
-    expect(commonSessionContext).not.toContain("update-check-");
-    expect(commonSessionContext).not.toContain("_get_update_hint");
-    expect(commonSessionContext).not.toContain("import subprocess");
+  it("keeps the template and dogfood session context free of upgrade hints", () => {
+    const dogfoodSessionContext = fs.readFileSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../../../.trellis/scripts/common/session_context.py",
+      ),
+      "utf-8",
+    );
+    for (const content of [commonSessionContext, dogfoodSessionContext]) {
+      expect(content).not.toContain('"trellis", "--version"');
+      expect(content).not.toContain("update-check-");
+      expect(content).not.toContain("_get_update_hint");
+      expect(content).not.toContain("import subprocess");
+      expect(content).not.toContain("trellis upgrade");
+    }
   });
 });
 
