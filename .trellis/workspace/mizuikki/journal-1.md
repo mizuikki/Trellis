@@ -148,3 +148,37 @@ Added safe planning artifact scaffolding, lifecycle readiness gates, cross-platf
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Fork-local version management
+
+**Date**: 2026-07-23
+**Task**: Fork-local version management
+**Package**: cli
+**Branch**: `feat/fork-local-version-management`
+
+### Summary
+
+Established the 1.0.0 fork compatibility line, removed upstream npm update and publishing behavior, recorded upstream provenance, and opened PR #6 against mizuikki/Trellis.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `28b6f7f2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
