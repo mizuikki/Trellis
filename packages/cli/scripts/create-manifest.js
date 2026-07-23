@@ -36,7 +36,6 @@
  *   X.Y.Z   → X.Y.(Z+1)-beta.0
  */
 
-import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -44,48 +43,19 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFESTS_DIR = path.join(__dirname, "../src/migrations/manifests");
-const PACKAGE_NAME = "@mindfoldhq/trellis";
-
 /**
- * Check whether `version` is already published on npm. Returns false on network
- * error so we fail open (don't block dev flow when npm is unreachable); the
- * release-time continuity check is the authoritative gate.
- */
-function versionOnNpm(version) {
-  try {
-    const out = execSync(`npm view ${PACKAGE_NAME}@${version} version 2>/dev/null`, {
-      encoding: "utf-8",
-      timeout: 8_000,
-    }).trim();
-    return out === version;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Abort if attempting to (over)write a manifest file for a version already
- * on npm. Once a version is published, its manifest is contract; mutating
- * it breaks the update chain for users at adjacent versions.
+ * Abort if attempting to overwrite an existing local manifest without an
+ * explicit override. Fork manifests are versioned in the checkout and are not
+ * validated against a package registry.
  */
 function guardAgainstPublishedManifest(version, manifestPath, allowOverwrite) {
   const exists = fs.existsSync(manifestPath);
-  const onNpm = versionOnNpm(version);
-
-  if (onNpm) {
-    console.error(
-      `\n✗ Version ${version} is already published on npm.\n` +
-      `  Its manifest is part of the update contract and must NOT be rewritten.\n` +
-      `  If you need to release additional migrations, use the NEXT version number.\n`,
-    );
-    process.exit(1);
-  }
 
   if (exists && !allowOverwrite) {
     console.error(
       `\n✗ ${manifestPath} already exists.\n` +
       `  Use --force in non-interactive modes, or answer "y" to the overwrite prompt\n` +
-      `  in interactive mode, if you really intend to rewrite a NOT-YET-PUBLISHED manifest.\n`,
+      `  in interactive mode, if you really intend to rewrite this local manifest.\n`,
     );
     process.exit(1);
   }

@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "description": "First fork-owned compatibility release.",
+  "breaking": true,
+  "recommendMigrate": true,
+  "changelog": "**Fork compatibility boundary:** consumer projects now use the fork-owned 1.x version line. The CLI and templates are maintained from this source checkout; no package-registry update path is available.",
+  "migrationGuide": "## Upgrade to the fork-owned 1.0.0 line\n\nThis is a one-time compatibility boundary for projects previously managed by upstream 0.6.x releases. Run `trellis update --migrate` from a source-built fork CLI. The existing 0.6.x migration manifests remain part of this update path and are applied in version order.\n\nUpdate the fork checkout and rebuild its CLI before updating a project. The CLI does not install or replace itself.",
+  "aiInstructions": "For an upstream 0.6.x consumer, first confirm the project stamp in `.trellis/.version`, then run `trellis update --dry-run --migrate` before applying `trellis update --migrate`. Do not run an update against this fork repository's own `.trellis/` deployment.",
+  "migrations": [],
+  "notes": "This fork starts its compatibility version line at 1.0.0. Update the source checkout to the intended revision, rebuild the CLI, then run `trellis update --migrate` for an existing consumer project."
+}

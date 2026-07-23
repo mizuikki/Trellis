@@ -258,6 +258,29 @@ describe("update() integration", () => {
     expect(entries.filter((e) => e.startsWith(".backup-")).length).toBe(0);
   });
 
+  it("does not query a package registry for the latest version", async () => {
+    await setupProject();
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+
+    await update({ force: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("upgrades an upstream 0.6.x consumer into the fork line exactly once", async () => {
+    await setupProject();
+    fs.writeFileSync(versionFilePath(), "0.6.2");
+
+    await update({ migrate: true, force: true });
+
+    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(VERSION);
+
+    const updatedVersion = fs.readFileSync(versionFilePath(), "utf-8");
+    await update({ migrate: true, force: true });
+    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(updatedVersion);
+  });
+
   it("#1b current OpenCode templates are not classified as deprecated", async () => {
     const startPath = ".opencode/commands/trellis/start.md";
     await init({ yes: true, force: true, opencode: true });

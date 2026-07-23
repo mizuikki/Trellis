@@ -42,7 +42,6 @@ Cross-cutting concerns:
 - [Code Quality](./shared/code-quality.md)
 - [Git Conventions](./shared/git-conventions.md)
 - [Timestamp Handling](./shared/timestamp.md)
-- [pnpm + Electron Setup](./shared/pnpm-electron-setup.md)
 
 ### [Guides](./guides/index.md)
 

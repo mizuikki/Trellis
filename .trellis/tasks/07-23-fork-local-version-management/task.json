@@ -3,7 +3,7 @@
   "name": "fork-local-version-management",
   "title": "Fork-local version management",
   "description": "Replace upstream npm-based version checks and publishing assumptions with a fork-owned version and provenance model that supports selective upstream synchronization.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "cli",

@@ -12,7 +12,6 @@
 | [typescript.md](./typescript.md)                   | TypeScript best practices         | Type-related decisions |
 | [git-conventions.md](./git-conventions.md)         | Git commit and branch conventions | Before committing      |
 | [timestamp.md](./timestamp.md)                     | Timestamp format specification    | Date/time handling     |
-| [pnpm-electron-setup.md](./pnpm-electron-setup.md) | pnpm + Electron project setup     | Project initialization |
 
 ---
 

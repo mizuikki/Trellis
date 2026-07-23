@@ -125,6 +125,15 @@ describe("getMigrationsForVersion", () => {
     expect(renames.length).toBeGreaterThan(0);
     expect(deletes.length).toBe(0);
   });
+
+  it("orders the historical 0.6.x ingress chain before the fork 1.0.0 line", () => {
+    const versions = getAllMigrationVersions();
+    expect(versions).toContain("1.0.0");
+    expect(compareVersions("0.6.2", "1.0.0")).toBeLessThan(0);
+    expect(getMigrationsForVersion("0.6.2", "1.0.0").length).toBeGreaterThan(
+      0,
+    );
+  });
 });
 
 // =============================================================================

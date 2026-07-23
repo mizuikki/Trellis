@@ -6,7 +6,7 @@ import inquirer from "inquirer";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import type { AITool } from "../types/ai-tools.js";
-import { VERSION, PACKAGE_NAME } from "../constants/version.js";
+import { VERSION } from "../constants/version.js";
 import {
   getMigrationsForVersion,
   getAllMigrations,
@@ -755,6 +755,9 @@ async function collectRegistrySpecTemplates(
   const config = loadSpecRegistryConfig(cwd);
   if (!config) return new Map();
 
+  // Registry-backed specs are the only update path that needs a network proxy.
+  setupProxy();
+
   let registry: RegistrySource;
   try {
     registry = parseRegistrySource(config.source);
@@ -1305,24 +1308,6 @@ function getInstalledVersion(cwd: string): string {
     return fs.readFileSync(versionPath, "utf-8").trim();
   }
   return "unknown";
-}
-
-/**
- * Fetch latest version from npm registry
- */
-async function getLatestNpmVersion(): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `https://registry.npmjs.org/${PACKAGE_NAME}/latest`,
-    );
-    if (!response.ok) {
-      return null;
-    }
-    const data = (await response.json()) as { version?: string };
-    return data.version ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -2085,39 +2070,17 @@ export async function update(options: UpdateOptions): Promise<void> {
   console.log(chalk.cyan("\nTrellis Update"));
   console.log(chalk.cyan("══════════════\n"));
 
-  // Set up proxy before any network calls (npm version check)
-  setupProxy();
-
   // Get versions
   const projectVersion = getInstalledVersion(cwd);
   const cliVersion = VERSION;
-  const latestNpmVersion = await getLatestNpmVersion();
 
   // Version comparison
   const cliVsProject = compareVersions(cliVersion, projectVersion);
-  const cliVsNpm = latestNpmVersion
-    ? compareVersions(cliVersion, latestNpmVersion)
-    : 0;
 
-  // Display versions with context
+  // Display the two local compatibility versions.
   console.log(`Project version: ${chalk.white(projectVersion)}`);
   console.log(`CLI version:     ${chalk.white(cliVersion)}`);
-  if (latestNpmVersion) {
-    console.log(`Latest on npm:   ${chalk.white(latestNpmVersion)}`);
-  } else {
-    console.log(chalk.gray("Latest on npm:   (unable to fetch)"));
-  }
   console.log("");
-
-  // Check if CLI is outdated compared to npm
-  if (cliVsNpm < 0 && latestNpmVersion) {
-    console.log(
-      chalk.yellow(
-        `⚠️  Your CLI (${cliVersion}) is behind npm (${latestNpmVersion}).`,
-      ),
-    );
-    console.log(chalk.yellow(`   Run: trellis upgrade\n`));
-  }
 
   // Check for downgrade situation
   if (cliVsProject < 0) {
@@ -2130,7 +2093,11 @@ export async function update(options: UpdateOptions): Promise<void> {
 
     if (!options.allowDowngrade) {
       console.log(chalk.gray("Solutions:"));
-      console.log(chalk.gray(`  1. Update your CLI: trellis upgrade`));
+      console.log(
+        chalk.gray(
+          "  1. Update this fork checkout to a compatible revision and rebuild the CLI.",
+        ),
+      );
       console.log(
         chalk.gray(`  2. Force downgrade: trellis update --allow-downgrade\n`),
       );

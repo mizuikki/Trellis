@@ -9,15 +9,15 @@ Cross-platform conversation memory for Claude Code, Codex CLI, and Pi. The `trel
 
 ## Prerequisite
 
-Trellis CLI **0.6.7 or later** installed globally:
+Use a locally built Trellis CLI from this fork checkout:
 
 ```bash
-npm install -g @mindfoldhq/trellis@latest
-trellis --version   # must be 0.6.7 or later
+pnpm build
+node /path/to/Trellis/packages/cli/dist/cli/index.js mem projects
 ```
 
-`trellis mem` ships bundled with the CLI; no extra setup. Version 0.6.7 adds
-project-local Pi `sessionDir` discovery (see the storage table below).
+`trellis mem` ships with the source-built CLI; no package installation or
+self-update command is required.
 
 The OpenCode reader is **temporarily unavailable in 0.6.0-beta.4** (returns
 empty + a one-shot stderr warning). Reverted from 0.6.0-beta.3 due to

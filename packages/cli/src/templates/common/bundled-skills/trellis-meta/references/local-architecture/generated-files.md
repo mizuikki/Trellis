@@ -71,10 +71,10 @@ Editable by default:
 
 Do not edit by default:
 
-- Global npm install directory
-- `node_modules/@mindfoldhq/trellis`
-- Trellis GitHub repository source code
+- Generated `dist/` output or `node_modules`
+- The fork source checkout unless the user explicitly wants to change Trellis
 - Concrete state files under `.trellis/.runtime/**`
 - Hash contents inside `.trellis/.template-hashes.json`
 
-Switch to the Trellis CLI source-code perspective only when the user explicitly wants to contribute upstream.
+Switch to the Trellis CLI source-code perspective only when the user explicitly
+wants to change the fork itself.
