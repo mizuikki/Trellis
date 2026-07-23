@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~224 | Active |
+| `journal-1.md` | ~262 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-07-23 | Sync upstream v0.6.8 Kimi support | `f005c5cb` | `sync/upstream-v0.6.8` |
 | 6 | 2026-07-23 | Migrate fork package namespace | `3ca64b99` | `feat/fork-local-version-management` |
 | 5 | 2026-07-23 | Fork-local version management | `28b6f7f2` | `feat/fork-local-version-management` |
 | 4 | 2026-07-23 | Implement authoring templates | `f42b61d8`, `9f9f8a50` | `feat/design-implement-authoring-templates` |
