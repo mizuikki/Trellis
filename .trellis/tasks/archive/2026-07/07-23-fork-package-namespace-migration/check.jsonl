@@ -1,0 +1,2 @@
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Used to validate the completed build, lint, and typecheck checks for the CLI workspace changes."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Used to validate the completed full Core and CLI test-suite check."}

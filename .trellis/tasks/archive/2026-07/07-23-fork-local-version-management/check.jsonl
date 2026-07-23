@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cli/backend/migrations.md","reason":"Review migration ordering, manifest metadata, and no-loss update behavior."}
+{"file":".trellis/spec/cli/backend/commands-update.md","reason":"Review update idempotency, downgrade protection, and user-facing output changes."}
+{"file":".trellis/spec/cli/backend/release-process.md","reason":"Review that local version equality remains while public npm behavior is removed."}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Review test isolation and meaningful assertions."}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Review the one-time 0.6.x consumer upgrade fixture and repeat-run coverage."}

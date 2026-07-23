@@ -17,7 +17,7 @@ This directory is for local AI working in a user project where Trellis was insta
 
 ## General Operation Order
 
-1. **Confirm platform and directories**: inspect which directories exist, such as `.claude/`, `.codex/`, `.cursor/`.
+1. **Confirm platform and directories**: inspect which directories exist, such as `.claude/`, `.codex/`, `.cursor/`, `.zcode/`.
 2. **Confirm the current active task**: run `python3 ./.trellis/scripts/task.py current --source`.
 3. **Read the local source of truth**: prefer `.trellis/workflow.md`, `.trellis/config.yaml`, and relevant platform files.
 4. **Modify narrowly**: edit only files related to the user's request.
@@ -32,14 +32,13 @@ This directory is for local AI working in a user project where Trellis was insta
 | Task material | `.trellis/tasks/<task>/` |
 | Project specs | `.trellis/spec/` |
 | Runtime scripts | `.trellis/scripts/` |
-| Platform integration | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, and similar directories |
+| Platform integration | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.zcode/`, and similar directories |
 | Shared skill | `.agents/skills/` |
 
 ## Things Not To Do By Default
 
-- Do not edit the global npm install directory.
-- Do not edit `node_modules/@mindfoldhq/trellis`.
-- Do not assume the user has the Trellis GitHub repository.
+- Do not edit generated `dist/` output or `node_modules`.
+- Do not assume the user has this fork's source checkout.
 - Do not overwrite local files already modified by the user with default templates.
 - Do not put team project rules into public `trellis-meta`; project rules belong in `.trellis/spec/` or a local skill.
 
@@ -48,7 +47,7 @@ This directory is for local AI working in a user project where Trellis was insta
 Switch to an upstream source-code perspective only when the user explicitly expresses one of these goals:
 
 - "I want to open a PR to Trellis"
-- "I want to change npm package publish contents"
+- "I want to change source distribution or release behavior"
 - "I want to fork Trellis"
 - "I want to modify the generation logic for `trellis init/update`"
 

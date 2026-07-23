@@ -4,7 +4,6 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { init } from "../commands/init.js";
 import { update } from "../commands/update.js";
-import { upgrade } from "../commands/upgrade.js";
 import { uninstall } from "../commands/uninstall.js";
 import { runMem } from "../commands/mem.js";
 import {
@@ -42,13 +41,17 @@ function checkForUpdates(cwd: string): void {
     );
     console.log(chalk.gray(`   Run: trellis update\n`));
   } else if (comparison < 0) {
-    // CLI is older than project - CLI needs updating
+    // The source checkout is older than the project it is updating.
     console.log(
       chalk.yellow(
         `\n⚠️  Your CLI (${cliVersion}) is older than project (${projectVersion})`,
       ),
     );
-    console.log(chalk.gray(`   Run: trellis upgrade\n`));
+    console.log(
+      chalk.gray(
+        "   Update this fork checkout to a compatible revision and rebuild the CLI.\n",
+      ),
+    );
   }
 }
 
@@ -167,32 +170,6 @@ program
         createNew: options.createNew as boolean,
         allowDowngrade: options.allowDowngrade as boolean,
         migrate: options.migrate as boolean,
-      });
-    } catch (error) {
-      console.error(
-        chalk.red("Error:"),
-        error instanceof Error ? error.message : error,
-      );
-      if (process.env.DEBUG || process.env.TRELLIS_DEBUG) {
-        console.error(error instanceof Error ? error.stack : error);
-      }
-      process.exit(1);
-    }
-  });
-
-program
-  .command("upgrade")
-  .description("Upgrade the global Trellis CLI package")
-  .option(
-    "--tag <tag>",
-    "npm dist-tag or version to install (default follows current channel: latest, beta, or rc)",
-  )
-  .option("--dry-run", "Print the install command without running it")
-  .action(async (options: Record<string, unknown>) => {
-    try {
-      await upgrade({
-        tag: options.tag as string | undefined,
-        dryRun: options.dryRun as boolean,
       });
     } catch (error) {
       console.error(

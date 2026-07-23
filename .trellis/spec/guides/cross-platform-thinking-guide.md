@@ -602,7 +602,6 @@ included with Trellis, verify the whole distribution path:
 - [ ] Source file exists in the branch being tagged, not only in another branch,
   docs submodule, or marketplace tree.
 - [ ] `pnpm build` copies the asset into `dist/templates/**`.
-- [ ] `npm pack --dry-run --json` includes the expected `dist/**` path.
 - [ ] The built binary installs the asset in a fresh temp repository.
 - [ ] `.trellis/.template-hashes.json` tracks the generated asset path.
 - [ ] `trellis update --dry-run` reports `Already up to date!` in that temp
@@ -610,14 +609,11 @@ included with Trellis, verify the whole distribution path:
 
 **Why this matters**: docs/changelog text can move independently from the code
 branch that owns distributable templates. A feature can be documented as bundled
-while the published npm tarball still lacks the files.
+while the built source checkout still lacks the files.
 
 ```bash
-pnpm --filter @mindfoldhq/trellis build
-
-cd packages/cli
-npm pack --dry-run --json | grep 'dist/templates/common/bundled-skills/<skill>/SKILL.md'
-cd ../..
+pnpm --filter @mizuikki/trellis build
+test -f packages/cli/dist/templates/common/bundled-skills/<skill>/SKILL.md
 
 tmpdir=$(mktemp -d /tmp/trellis-built-bin-smoke-XXXXXX)
 printf '{"name":"trellis-smoke","version":"0.0.0"}\n' > "$tmpdir/package.json"

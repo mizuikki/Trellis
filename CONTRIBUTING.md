@@ -6,7 +6,7 @@ Thanks for your interest in contributing to Trellis! This document provides guid
 
 ### Reporting Bugs
 
-Before creating a bug report, please check [existing issues](https://github.com/mindfold-ai/Trellis/issues) to avoid duplicates.
+This fork accepts issues and pull requests only at [mizuikki/Trellis](https://github.com/mizuikki/Trellis). Before creating a bug report, please check [existing issues](https://github.com/mizuikki/Trellis/issues) to avoid duplicates.
 
 When reporting a bug, include:
 - Trellis version (`trellis --version`)
@@ -142,7 +142,7 @@ docs(readme): update quick start instructions
    git push origin feat/your-feature-name
    ```
 
-5. **Open a Pull Request** against `main` branch
+5. **Open a Pull Request** against the `mizuikki/Trellis` `main` branch
    - Provide a clear description of changes
    - Reference any related issues
    - Include screenshots for UI changes

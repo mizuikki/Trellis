@@ -82,6 +82,23 @@ describe("pruneOrphanManifestKeys", () => {
     expect(kept).not.toHaveProperty(".claude/sessions/user.jsonl");
   });
 
+  it("preserves rename-dir descendants only under the migration target", () => {
+    const hashes = {
+      ".claude/skills/trellis-spec-bootstarp/user-file.md": "source-child",
+      ".claude/skills/trellis-spec-bootstrap/SKILL.md": "target-child",
+    };
+    saveHashes(tmpDir, hashes);
+
+    const { pruned, hashes: kept } = pruneOrphanManifestKeys(tmpDir, [], hashes);
+
+    expect(pruned).toEqual([
+      ".claude/skills/trellis-spec-bootstarp/user-file.md",
+    ]);
+    expect(kept).toEqual({
+      ".claude/skills/trellis-spec-bootstrap/SKILL.md": "target-child",
+    });
+  });
+
   it("keeps root-level AGENTS.md when it has Trellis managed-block markers", () => {
     const hashes = { "AGENTS.md": "h" };
     fs.writeFileSync(

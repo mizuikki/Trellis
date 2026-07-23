@@ -258,6 +258,68 @@ describe("update() integration", () => {
     expect(entries.filter((e) => e.startsWith(".backup-")).length).toBe(0);
   });
 
+  it("does not query a package registry for the latest version", async () => {
+    await setupProject();
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+
+    await update({ force: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves a customized upstream rename-dir source when entering the fork line", async () => {
+    // This is the layout produced by upstream 0.6.3-0.6.5 for ZCode. Version
+    // 0.6.6 relocated these agents from `.zcode/cli/agents/` to
+    // `.zcode/agents/`, so it exercises a real pending upstream migration
+    // while crossing the fork boundary.
+    await init({ yes: true, force: true, zcode: true });
+    fs.writeFileSync(versionFilePath(), "0.6.5");
+
+    const legacyAgentPath = ".zcode/cli/agents/trellis-implement.md";
+    const migratedAgentPath = ".zcode/agents/trellis-implement.md";
+    const upstreamAgentContent =
+      "---\n" +
+      "name: trellis-implement\n" +
+      "description: Code implementation expert.\n" +
+      'color: "#4f46e5"\n' +
+      "---\n\n" +
+      "# Implement Agent\n\n" +
+      "Legacy upstream ZCode agent definition.\n";
+    const customizedAgentContent =
+      upstreamAgentContent + "\nCustom consumer instructions.\n";
+    writeProjectFile(legacyAgentPath, customizedAgentContent);
+    fs.rmSync(path.dirname(projectFile(migratedAgentPath)), {
+      recursive: true,
+      force: true,
+    });
+
+    let hashes = readHashesV2(hashFilePath());
+    for (const hashPath of Object.keys(hashes)) {
+      if (hashPath.startsWith(".zcode/agents/")) {
+        hashes = removeHashEntry(hashes, hashPath) as Record<string, string>;
+      }
+    }
+    hashes[legacyAgentPath] = computeHash(upstreamAgentContent);
+    writeHashesV2(hashFilePath(), hashes);
+
+    const prompt = vi.mocked(inquirer.prompt);
+    prompt.mockResolvedValueOnce({ proceed: true });
+    prompt.mockResolvedValueOnce({ action: "skip" });
+    await update({ migrate: true });
+
+    expect(fs.readFileSync(versionFilePath(), "utf-8")).toBe(VERSION);
+    expect(fs.existsSync(projectFile(legacyAgentPath))).toBe(false);
+    expect(fs.existsSync(projectFile(migratedAgentPath))).toBe(true);
+    expect(readProjectFile(migratedAgentPath)).toBe(customizedAgentContent);
+    expect(readHashesV2(hashFilePath())[legacyAgentPath]).toBeUndefined();
+    expect(readHashesV2(hashFilePath())[migratedAgentPath]).toBe(
+      computeHash(upstreamAgentContent),
+    );
+    expect(prompt).toHaveBeenCalledTimes(2);
+    expect(prompt.mock.calls[1]?.[0][0]?.message).toContain(migratedAgentPath);
+  });
+
   it("#1b current OpenCode templates are not classified as deprecated", async () => {
     const startPath = ".opencode/commands/trellis/start.md";
     await init({ yes: true, force: true, opencode: true });

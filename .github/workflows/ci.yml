@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'marketplace/**'
       - '.github/workflows/ci.yml'
+      - 'UPSTREAM_SYNC.md'
   pull_request:
     branches: [main]
     paths:
@@ -21,6 +22,7 @@ on:
       - 'package.json'
       - 'marketplace/**'
       - '.github/workflows/ci.yml'
+      - 'UPSTREAM_SYNC.md'
 
 jobs:
   build:
@@ -49,6 +51,9 @@ jobs:
 
       - name: Lint (core + cli)
         run: pnpm lint
+
+      - name: Verify fork version alignment
+        run: node packages/cli/scripts/release-preflight.js check-versions
 
       - name: Build (core then cli)
         run: pnpm build

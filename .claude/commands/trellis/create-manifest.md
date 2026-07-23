@@ -6,16 +6,16 @@ Create a migration manifest for a new patch, beta, rc, or minor release based on
 
 - `$ARGUMENTS` - Target version, for example `0.5.15` or `0.6.0-beta.14`. If omitted, ask the user.
 
-## Package release model
+## Source release model
 
-Trellis currently publishes two npm packages from the same git tag:
+Trellis is maintained from a source checkout with two version-locked workspace
+packages:
 
-- `@mindfoldhq/trellis`
-- `@mindfoldhq/trellis-core`
+- `@mizuikki/trellis`
+- `@mizuikki/trellis-core`
 
-Both packages must always share the exact same version and npm dist-tag. Source uses `workspace:*`; the packed CLI must depend on the exact published core version.
-
-Official npm publishing is CI-only. Never use local `npm publish` or `pnpm publish` to compensate for a failed or partial release. Local verification may use `pnpm pack`, `release-preflight`, tests, lint, typecheck, and `npm view`.
+Both packages must always share the exact same version. Source uses `workspace:*`.
+Do not publish, pack, query npm, or use dist-tags for this fork.
 
 ## Step 1: Identify Last Release
 
@@ -142,8 +142,6 @@ Run local verification only; do not publish locally.
 
 ```bash
 node packages/cli/scripts/release-preflight.js check-versions
-node packages/cli/scripts/release-preflight.js verify-packed-cli
-node packages/cli/scripts/release-preflight.js publish-plan
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -155,11 +153,12 @@ Verify:
 
 1. `packages/cli/src/migrations/manifests/<version>.json` exists and has valid JSON.
 2. Manifest `changelog` renders as real newlines.
-3. `@mindfoldhq/trellis` and `@mindfoldhq/trellis-core` versions still match.
+3. `@mizuikki/trellis` and `@mizuikki/trellis-core` versions still match.
 
-## Step 9: Publish Through CI
+## Step 9: Record The Source Release
 
-Use the project release script so the tag starts CI:
+Use the project release script only when a source version bump and local tag are
+intended:
 
 ```bash
 pnpm release
@@ -168,22 +167,16 @@ pnpm release:rc
 pnpm release:promote
 ```
 
-After CI succeeds, verify public npm:
-
-```bash
-npm view @mindfoldhq/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-npm view @mindfoldhq/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-```
-
-If CI fails or npm visibility is wrong, fix the workflow/scripts and re-run the CI path. Do not use local publish to fill the gap.
+Do not publish or verify package-registry visibility.
 
 ## Dogfooding
 
 Breaking releases must run end-to-end migration in a throwaway directory:
 
 ```bash
+pnpm --dir <repo> build
 mkdir /tmp/migrate-test && cd /tmp/migrate-test && git init -q .
-npx -y @mindfoldhq/trellis@<last-ga> init -y -u test --claude --cursor --<platforms>
+node <repo>/packages/cli/dist/cli/index.js init -y -u test --claude --cursor --<platforms>
 node <repo>/packages/cli/dist/cli/index.js update --migrate --dry-run
 yes | node <repo>/packages/cli/dist/cli/index.js update --migrate --force
 yes | node <repo>/packages/cli/dist/cli/index.js update

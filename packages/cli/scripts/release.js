@@ -4,7 +4,7 @@
  *
  * This keeps package.json as a thin command table while the release sequence
  * stays in one place:
- *   manifest guard -> tests -> pre-release commit -> synchronized bump
+ *   tests -> pre-release commit -> synchronized bump
  *   -> version check -> version commit -> tag -> push
  */
 import { execSync } from "node:child_process";
@@ -68,8 +68,7 @@ function main() {
     fail(`usage: release.js <patch|minor|major|beta|rc|promote>`);
   }
 
-  run("node scripts/check-manifest-continuity.js");
-  run("pnpm --filter @mindfoldhq/trellis-core test");
+  run("pnpm --filter @mizuikki/trellis-core test");
   run("pnpm test");
 
   // Exclude .trellis/ from the pre-release sweep: dirty task/workspace files

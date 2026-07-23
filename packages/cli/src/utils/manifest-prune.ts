@@ -59,24 +59,33 @@ export interface PruneResult {
  *   - every migration manifest's from/to path (preserve so legitimate
  *     pending migrations can find their source/target)
  */
-function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
-  const known = new Set<string>();
+function buildKnownKeys(configuredPlatforms: readonly AITool[]): {
+  exact: Set<string>;
+  directoryPrefixes: Set<string>;
+} {
+  const exact = new Set<string>();
+  const directoryPrefixes = new Set<string>();
   for (const id of configuredPlatforms) {
     const templates = collectPlatformTemplates(id);
     if (!templates) continue;
     for (const key of templates.keys()) {
-      known.add(toPosix(key));
+      exact.add(toPosix(key));
     }
   }
   // Preserve any path referenced by a migration: legitimate pending
   // rename/delete operations need to resolve their `from` (and the target's
   // hash record for `to`) even if the current registry doesn't list it.
   for (const migration of getAllMigrations()) {
-    if (migration.from) known.add(toPosix(migration.from));
-    if (migration.to) known.add(toPosix(migration.to));
+    exact.add(toPosix(migration.from));
+    if (!migration.to) continue;
+    const target = toPosix(migration.to);
+    exact.add(target);
+    if (migration.type === "rename-dir") {
+      directoryPrefixes.add(target + "/");
+    }
   }
 
-  return known;
+  return { exact, directoryPrefixes };
 }
 
 /**
@@ -150,7 +159,10 @@ export function pruneOrphanManifestKeys(
       }
       continue;
     }
-    if (known.has(key)) {
+    if (
+      known.exact.has(key) ||
+      [...known.directoryPrefixes].some((prefix) => key.startsWith(prefix))
+    ) {
       kept[key] = value;
       continue;
     }

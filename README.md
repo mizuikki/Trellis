@@ -12,7 +12,6 @@
 </p>
 
 <p align="center">
-<a href="./README_CN.md">简体中文</a> •
 <a href="https://docs.trytrellis.app/">Docs</a> •
 <a href="https://docs.trytrellis.app/start/install-and-first-task">Quick Start</a> •
 <a href="https://docs.trytrellis.app/advanced/multi-platform">Supported Platforms</a> •
@@ -20,16 +19,14 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/v/@mindfoldhq/trellis.svg?style=flat-square&color=2563eb" alt="npm version" /></a>
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/dw/@mindfoldhq/trellis?style=flat-square&color=cb3837&label=downloads" alt="npm downloads" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/stargazers"><img src="https://img.shields.io/github/stars/mindfold-ai/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
+<a href="https://github.com/mizuikki/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
+<a href="https://github.com/mizuikki/Trellis/stargazers"><img src="https://img.shields.io/github/stars/mizuikki/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
 <a href="https://docs.trytrellis.app/"><img src="https://img.shields.io/badge/docs-trytrellis.app-0f766e?style=flat-square" alt="docs" /></a>
 <a href="https://discord.com/invite/tWcCZ3aRHc"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/issues"><img src="https://img.shields.io/github/issues/mindfold-ai/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mindfold-ai/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
-<a href="https://deepwiki.com/mindfold-ai/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
-<a href="https://chatgpt.com/?q=Explain+the+project+mindfold-ai/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
+<a href="https://github.com/mizuikki/Trellis/issues"><img src="https://img.shields.io/github/issues/mizuikki/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
+<a href="https://github.com/mizuikki/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mizuikki/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
+<a href="https://deepwiki.com/mizuikki/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
+<a href="https://chatgpt.com/?q=Explain+the+project+mizuikki/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
 </p>
 
 <p align="center">
@@ -54,14 +51,15 @@
 ## Quick Start
 
 ```bash
-# 1. Install Trellis
-npm install -g @mindfoldhq/trellis@latest
+# 1. Build Trellis from this checkout
+pnpm install --frozen-lockfile
+pnpm build
 
-# 2. Initialize in your repo
-trellis init -u your-name
+# 2. Initialize another repo with the built CLI
+node /path/to/Trellis/packages/cli/dist/cli/index.js init -u your-name
 
 # 3. Or initialize with the platforms you actually use
-trellis init --cursor --opencode --codex -u your-name
+node /path/to/Trellis/packages/cli/dist/cli/index.js init --cursor --opencode --codex -u your-name
 ```
 
 See the [Quick Start](https://docs.trytrellis.app/start/install-and-first-task) and [Supported Platforms](https://docs.trytrellis.app/advanced/multi-platform) guides for setup details.
@@ -133,17 +131,17 @@ Yes. Personal workspace journals stay separate per developer, while shared specs
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=mindfold-ai/Trellis&type=Date)](https://star-history.com/#mindfold-ai/Trellis&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=mizuikki/Trellis&type=Date)](https://star-history.com/#mizuikki/Trellis&Date)
 
 ## Community & Resources
 
 - [Official Docs](https://docs.trytrellis.app/)
-- [GitHub Issues](https://github.com/mindfold-ai/Trellis/issues)
+- [GitHub Issues](https://github.com/mizuikki/Trellis/issues)
 - [Discord](https://discord.com/invite/tWcCZ3aRHc)
 - [Tech Blog](https://docs.trytrellis.app/blog)
 
 <p align="center">
-<a href="https://github.com/mindfold-ai/Trellis">Official Repository</a> •
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE">AGPL-3.0 License</a> •
-Built by <a href="https://github.com/mindfold-ai">Mindfold</a>
+<a href="https://github.com/mizuikki/Trellis">Repository</a> •
+<a href="https://github.com/mizuikki/Trellis/blob/main/LICENSE">AGPL-3.0 License</a> •
+Fork maintained by <a href="https://github.com/mizuikki">mizuikki</a>, based on Trellis by <a href="https://github.com/mindfold-ai">Mindfold</a>
 </p>

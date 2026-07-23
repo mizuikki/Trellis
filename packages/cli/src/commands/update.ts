@@ -6,7 +6,7 @@ import inquirer from "inquirer";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import type { AITool } from "../types/ai-tools.js";
-import { VERSION, PACKAGE_NAME } from "../constants/version.js";
+import { VERSION } from "../constants/version.js";
 import {
   getMigrationsForVersion,
   getAllMigrations,
@@ -755,6 +755,9 @@ async function collectRegistrySpecTemplates(
   const config = loadSpecRegistryConfig(cwd);
   if (!config) return new Map();
 
+  // Registry-backed specs are the only update path that needs a network proxy.
+  setupProxy();
+
   let registry: RegistrySource;
   try {
     registry = parseRegistrySource(config.source);
@@ -1308,24 +1311,6 @@ function getInstalledVersion(cwd: string): string {
 }
 
 /**
- * Fetch latest version from npm registry
- */
-async function getLatestNpmVersion(): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `https://registry.npmjs.org/${PACKAGE_NAME}/latest`,
-    );
-    if (!response.ok) {
-      return null;
-    }
-    const data = (await response.json()) as { version?: string };
-    return data.version ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Recursively collect all files in a directory
  */
 function collectAllFiles(dirPath: string, cwd = process.cwd()): string[] {
@@ -1823,6 +1808,7 @@ export async function executeMigrations(
   cwd: string,
   options: { force?: boolean; skipAll?: boolean },
   templates: Map<string, string>,
+  hashes?: TemplateHashes,
 ): Promise<MigrationResult> {
   const result: MigrationResult = {
     renamed: 0,
@@ -1833,6 +1819,7 @@ export async function executeMigrations(
 
   // Sort migrations for safe execution order
   const sortedAuto = sortMigrationsForExecution(classified.auto);
+  let migrationHashes = hashes ?? loadHashes(cwd);
 
   // 1. Execute auto migrations (unmodified files and directories)
   for (const item of sortedAuto) {
@@ -1873,13 +1860,13 @@ export async function executeMigrations(
       ) {
         removeDirectoryRecursive(oldPath);
 
-        const hashes = loadHashes(cwd);
         const updatedHashes: TemplateHashes = {};
-        for (const [hashPath, hashValue] of Object.entries(hashes)) {
+        for (const [hashPath, hashValue] of Object.entries(migrationHashes)) {
           if (hashPath.startsWith(oldPrefix)) continue; // source retired
           updatedHashes[hashPath] = hashValue;
         }
         saveHashes(cwd, updatedHashes);
+        migrationHashes = updatedHashes;
 
         result.deleted++;
         continue;
@@ -1898,10 +1885,8 @@ export async function executeMigrations(
       fs.renameSync(oldPath, newPath);
 
       // Batch update hash tracking for all files in the directory
-      const hashes = loadHashes(cwd);
-
       const updatedHashes: TemplateHashes = {};
-      for (const [hashPath, hashValue] of Object.entries(hashes)) {
+      for (const [hashPath, hashValue] of Object.entries(migrationHashes)) {
         if (hashPath.startsWith(oldPrefix)) {
           // Rename path: old prefix -> new prefix
           const newHashPath = newPrefix + hashPath.slice(oldPrefix.length);
@@ -1916,6 +1901,7 @@ export async function executeMigrations(
         }
       }
       saveHashes(cwd, updatedHashes);
+      migrationHashes = updatedHashes;
 
       result.renamed++;
     } else if (item.type === "delete") {
@@ -2085,39 +2071,17 @@ export async function update(options: UpdateOptions): Promise<void> {
   console.log(chalk.cyan("\nTrellis Update"));
   console.log(chalk.cyan("══════════════\n"));
 
-  // Set up proxy before any network calls (npm version check)
-  setupProxy();
-
   // Get versions
   const projectVersion = getInstalledVersion(cwd);
   const cliVersion = VERSION;
-  const latestNpmVersion = await getLatestNpmVersion();
 
   // Version comparison
   const cliVsProject = compareVersions(cliVersion, projectVersion);
-  const cliVsNpm = latestNpmVersion
-    ? compareVersions(cliVersion, latestNpmVersion)
-    : 0;
 
-  // Display versions with context
+  // Display the two local compatibility versions.
   console.log(`Project version: ${chalk.white(projectVersion)}`);
   console.log(`CLI version:     ${chalk.white(cliVersion)}`);
-  if (latestNpmVersion) {
-    console.log(`Latest on npm:   ${chalk.white(latestNpmVersion)}`);
-  } else {
-    console.log(chalk.gray("Latest on npm:   (unable to fetch)"));
-  }
   console.log("");
-
-  // Check if CLI is outdated compared to npm
-  if (cliVsNpm < 0 && latestNpmVersion) {
-    console.log(
-      chalk.yellow(
-        `⚠️  Your CLI (${cliVersion}) is behind npm (${latestNpmVersion}).`,
-      ),
-    );
-    console.log(chalk.yellow(`   Run: trellis upgrade\n`));
-  }
 
   // Check for downgrade situation
   if (cliVsProject < 0) {
@@ -2130,7 +2094,11 @@ export async function update(options: UpdateOptions): Promise<void> {
 
     if (!options.allowDowngrade) {
       console.log(chalk.gray("Solutions:"));
-      console.log(chalk.gray(`  1. Update your CLI: trellis upgrade`));
+      console.log(
+        chalk.gray(
+          "  1. Update this fork checkout to a compatible revision and rebuild the CLI.",
+        ),
+      );
       console.log(
         chalk.gray(`  2. Force downgrade: trellis update --allow-downgrade\n`),
       );
@@ -2148,6 +2116,10 @@ export async function update(options: UpdateOptions): Promise<void> {
 
   // Load template hashes for modification detection
   let hashes = loadHashes(cwd);
+  // Pruning removes stale rename-dir source descendants from the persisted
+  // manifest. Keep them in memory until pending migrations are classified so
+  // a legitimate, tracked legacy directory can still be relocated.
+  const migrationHashes = hashes;
   const isFirstHashTracking = Object.keys(hashes).length === 0;
 
   // Handle unknown version - skip regular migrations but safe-file-delete still runs
@@ -2290,7 +2262,7 @@ export async function update(options: UpdateOptions): Promise<void> {
     classifiedMigrations = classifyMigrations(
       pendingMigrations,
       cwd,
-      hashes,
+      migrationHashes,
       templates,
     );
 
@@ -2364,8 +2336,8 @@ export async function update(options: UpdateOptions): Promise<void> {
   }
 
   // Analyze changes (pass hashes for modification detection)
-  const changes = analyzeChanges(cwd, hashes, templates);
-  const missingManagedFileHashes = collectMissingManagedFileHashes(
+  let changes = analyzeChanges(cwd, hashes, templates);
+  let missingManagedFileHashes = collectMissingManagedFileHashes(
     changes,
     hashes,
   );
@@ -2539,8 +2511,16 @@ export async function update(options: UpdateOptions): Promise<void> {
         skipAll: options.skipAll,
       },
       templates,
+      migrationHashes,
     );
     printMigrationResult(migrationResult);
+
+    // A rename can create a path that the initial plan classified as new.
+    // Recompute against the migrated files and hashes before writing templates
+    // so customized source content reaches the normal conflict flow.
+    hashes = loadHashes(cwd);
+    changes = analyzeChanges(cwd, hashes, templates);
+    missingManagedFileHashes = collectMissingManagedFileHashes(changes, hashes);
 
     // Hardcoded: Rename traces-*.md to journal-*.md in workspace directories
     // Why hardcoded: The migration system only supports fixed path renames, not pattern-based.

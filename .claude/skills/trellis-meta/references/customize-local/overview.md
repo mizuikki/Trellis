@@ -1,6 +1,6 @@
 # Local Customization Overview
 
-This directory is for local AI working in a user project where Trellis was installed through npm and `trellis init` has already been run. The AI should modify generated `.trellis/` and platform directories inside the project, not Trellis CLI upstream source code.
+This directory is for local AI working in a user project where Trellis has already been initialized. This source-managed fork may not be checked out locally; modify generated `.trellis/` and platform directories inside the project unless the user explicitly provides the fork checkout for source changes.
 
 ## First Determine What The User Actually Wants To Change
 
@@ -37,9 +37,8 @@ This directory is for local AI working in a user project where Trellis was insta
 
 ## Things Not To Do By Default
 
-- Do not edit the global npm install directory.
-- Do not edit `node_modules/@mindfoldhq/trellis`.
-- Do not assume the user has the Trellis GitHub repository.
+- Do not edit generated `dist/` output or `node_modules`.
+- Do not assume the user has this fork's source checkout.
 - Do not overwrite local files already modified by the user with default templates.
 - Do not put team project rules into public `trellis-meta`; project rules belong in `.trellis/spec/` or a local skill.
 
@@ -48,7 +47,7 @@ This directory is for local AI working in a user project where Trellis was insta
 Switch to an upstream source-code perspective only when the user explicitly expresses one of these goals:
 
 - "I want to open a PR to Trellis"
-- "I want to change npm package publish contents"
+- "I want to change source distribution or release behavior"
 - "I want to fork Trellis"
 - "I want to modify the generation logic for `trellis init/update`"
 
