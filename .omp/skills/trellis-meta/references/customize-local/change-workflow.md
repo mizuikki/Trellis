@@ -54,18 +54,13 @@ If the user wants only one platform to avoid sub-agents, first confirm whether t
 | `planning` | present regular design/implement artifact has `<!-- trellis:scaffold-unfilled -->` in its first five lines | artifact-pending: fill and review Core and triggered semantics before removing its sentinel |
 | `planning` | lightweight task with `prd.md` complete | ask for start review, then run `task.py start` |
 | `planning` | complex task missing `design.md` or `implement.md` | run `python3 ./.trellis/scripts/task.py scaffold <task> all`, then complete artifacts |
-| `planning` | machine-ready, authoring-reviewed complex artifacts and `implement.jsonl` only has the seed `_example` row | Phase 1.3 (curate JSONL context) |
-| `planning` | machine-ready, authoring-reviewed complex artifacts and `implement.jsonl` curated | Phase 1.4 (run `task.py start`) |
+| `planning` | complex task has machine-ready, authoring-reviewed `prd.md`, `design.md`, and `implement.md` | ask for start review, then run `task.py start` |
 | `in_progress` | no implementation in conversation history | Phase 2.1 (`trellis-implement`) |
 | `in_progress` | implementation done, no `trellis-check` run | Phase 2.2 (`trellis-check`) |
-| `in_progress` | check passed | Phase 3.1 (verify quality + spec update) |
+| `in_progress` | check passed | Phase 3.3 (spec update) → 3.4 (commit) |
 | `completed` | task is still in active tree | Phase 3.5 (run `/trellis:finish-work` to archive) |
 
 When you add a custom status (e.g. `in-review`), add a `[workflow-state:in-review]` block in `.trellis/workflow.md` for the per-turn breadcrumb AND extend this route table — usually by editing the `/trellis:continue` command file (`.{platform}/commands/trellis/continue.md` or equivalent) to add a row that decides where to resume from. Without the route entry, `/trellis:continue` will fall through to a default branch and the user will not land on the step you intended.
-
-## Artifact Readiness
-
-For a complex task missing `design.md` or `implement.md`, route to `python3 ./.trellis/scripts/task.py scaffold <task> all`. A present non-regular path (including a symlink), unreadable, non-UTF-8, or empty artifact must be replaced or recreated; a regular artifact with a first-five-line `<!-- trellis:scaffold-unfilled -->` sentinel is pending, not complete. Fill and review Core and triggered semantics before removing its sentinel and starting the task.
 
 ## Notes
 

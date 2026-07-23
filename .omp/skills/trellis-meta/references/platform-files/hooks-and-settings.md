@@ -27,6 +27,9 @@ Common files:
 | GitHub Copilot | `.github/copilot/hooks.json` |
 | Factory Droid | `.factory/settings.json` |
 | Pi Agent | `.pi/settings.json`, `.pi/extensions/trellis/` |
+| Trae IDE | `.trae/hooks.json` |
+
+Reasonix is a pull-based platform whose agent files contain prelude instructions to read context after startup. ZCode uses `.zcode/config.json` with shared hooks, including PreToolUse for sub-agent prompt injection.
 
 Whether these files exist in a project depends on which `trellis init --<platform>` flags the user ran.
 

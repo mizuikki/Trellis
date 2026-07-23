@@ -150,34 +150,56 @@ The final planning summary must show Goal, In Scope, Out of Scope, Acceptance Cr
 - out of scope
 - open questions that still block planning
 
-`design.md` records technical design for complex tasks:
+Lightweight tasks may remain PRD-only. Complex tasks require technical design or an ordered multi-step execution plan; they must have `prd.md`, `design.md`, and `implement.md`. If either complex artifact is missing, run:
 
-- architecture and boundaries
-- data flow and contracts
-- compatibility and migration notes
-- important trade-offs
-- operational or rollback considerations
+```bash
+python3 ./.trellis/scripts/task.py scaffold <task> all
+```
 
-`implement.md` records execution planning for complex tasks:
+The scaffold is a prompt, not completed planning. An artifact is not ready when its path is non-regular or a symlink, unreadable or non-UTF-8, empty, or still has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines.
 
-- ordered implementation checklist
-- validation commands
-- risky files or rollback points
-- follow-up checks before `task.py start`
+### Technical `design.md`
 
-Lightweight tasks may have only `prd.md`. Complex tasks must have `prd.md`, `design.md`, and `implement.md` before `task.py start`.
+Core questions for every complex task:
+
+| ID | Required answer |
+|----|-----------------|
+| D-BOUND | What changes, what does not, and where are the boundaries? |
+| D-MECH | What mechanisms and technical decisions implement the behavior, and why? |
+| D-RISK | What compatibility, migration, failure-mode, and rollback-strategy decisions apply? |
+
+Triggered or optional questions:
+
+| ID | Rule |
+|----|------|
+| D-OVERVIEW | Optional orientation for multiple subsystems. |
+| D-FLOW | Required for non-trivial runtime, state, or data flow. |
+| D-CONTRACT | Required for cross-component API, event, file, or persistence contracts. |
+| D-ALT | Optional when real alternatives affected the decision. |
+| D-TEST | Optional verification strategy and coverage intent, not shell recipes. |
+| D-HANDOFF | Optional decision freeze when implementation must preserve several conclusions. |
+
+### Execution `implement.md`
+
+| ID | Required answer |
+|----|-----------------|
+| I-STEPS | What is the ordered, checkable work? |
+| I-VAL | How can another agent reproduce verification, including pass criteria? |
+| I-ROLL | What concrete rollback steps, checkpoints, files, or commands apply? Use N/A only with a reason. |
+| I-EXIT | What task-specific blockers and entry/exit criteria apply? Reference global workflow gates instead of copying them. |
+
+Project-specific plans may add I-LOG, I-MULTI, I-NONGOAL, or I-PROGRESS when useful; they are not global defaults. D-RISK owns rollback strategy while I-ROLL owns concrete rollback actions. D-TEST owns design-level coverage intent while I-VAL owns reproducible checks. `implement.md` references design decisions instead of duplicating them.
+
+### Authoring Review
+
+- Delete unused Optional sections instead of leaving TBD placeholders.
+- Reject empty sections and pristine prompt-only scaffolds as planning-ready.
+- Do not lint or require fixed H2 names. The IDs above are internal review labels, not runtime schema or permanent user-document requirements.
+- Review Core and every applicable triggered question per artifact. Remove that artifact's sentinel only after it passes this review.
+- Feature/foundation work often triggers D-FLOW and D-CONTRACT; remediation may be shorter but needs precise boundaries and regression points; audit/recon work should define its evidence standard and state model.
+- Task `design.md` is technical planning. A UI or brand `DESIGN.md` is a separate visual-system artifact.
 
 `implement.md` is not a replacement for `implement.jsonl`. On sub-agent-dispatch workflows, `implement.jsonl` and `check.jsonl` must each contain at least one real spec/research entry before `task.py start`; the seed `_example` row does not count. Inline workflows skip this JSONL gate because Phase 2 loads context through `trellis-before-dev`.
-
-### Complex Artifact Authoring
-
-For missing complex artifacts, run `python3 ./.trellis/scripts/task.py scaffold <task> all`. A scaffold is a prompt, not planning-ready. A present `design.md` or `implement.md` is pending when it is non-regular or a symlink, unreadable, non-UTF-8, empty, or has the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines.
-
-Review design Core labels D-BOUND (boundary), D-MECH (mechanisms and decisions), and D-RISK (compatibility, failure modes, rollback strategy). D-FLOW is required for non-trivial runtime/state/data flow and D-CONTRACT for cross-component APIs, events, files, or persistence; D-OVERVIEW, D-ALT, D-TEST, and D-HANDOFF are optional when useful.
-
-Review implement Core labels I-STEPS (ordered work), I-VAL (reproducible verification), I-ROLL (concrete rollback actions, or N/A with reason), and I-EXIT (task-specific gates). D-RISK is strategy while I-ROLL is execution; D-TEST is coverage intent while I-VAL is reproducible validation. I-LOG, I-MULTI, I-NONGOAL, and I-PROGRESS are project-specific additions, not global defaults.
-
-Delete unused Optional sections; reject empty sections and pristine prompt-only scaffolds. Remove each sentinel only after that artifact's Core and triggered semantics pass review. These labels are internal review vocabulary, not runtime schema or permanent user-document requirements; do not lint H2 names. Task `design.md` is technical planning, not a UI or brand `DESIGN.md`.
 
 ## PRD Convergence Pass
 

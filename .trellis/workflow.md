@@ -163,7 +163,7 @@ Phase 3: Finish  → verify, update spec, commit, and wrap up
 - `implement.jsonl` / `check.jsonl` — spec and research manifests for sub-agent context. They do not replace `implement.md`.
 - Lightweight tasks may be PRD-only. Complex tasks must have `prd.md`, `design.md`, and `implement.md` before `task.py start`.
 - For missing complex artifacts, run `python3 ./.trellis/scripts/task.py scaffold <task> all`; a scaffold is a prompt, not completed planning.
-- Any present `design.md` / `implement.md` that is non-regular, unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines is artifact-pending. Fill and review its Core and triggered semantics before removing its sentinel. `task.py start` enforces this lifecycle gate without parsing headings or prose.
+- Any present `design.md` / `implement.md` that is non-regular (including a symlink), unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines is artifact-pending. Fill and review its Core and triggered semantics before removing its sentinel. `task.py start` enforces this lifecycle gate without parsing headings or prose.
 
 ### Parent / Child Task Trees
 

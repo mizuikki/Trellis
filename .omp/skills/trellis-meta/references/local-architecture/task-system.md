@@ -22,15 +22,11 @@ The Trellis task system is stored entirely under `.trellis/tasks/` in the user p
 | --- | --- |
 | `task.json` | Task metadata: status, assignee, priority, branch, parent/child tasks, and similar fields. |
 | `prd.md` | Requirements, constraints, and acceptance criteria. Lightweight tasks may be PRD-only. |
-| `design.md` | Technical design for complex tasks: boundaries, contracts, data flow, compatibility, tradeoffs. |
-| `implement.md` | Execution plan for complex tasks: ordered checklist, validation commands, review gates, rollback points. |
+| `design.md` | Technical design for complex tasks: Core boundary/mechanism/risk decisions plus applicable flow and contract content. Scaffold on demand; a header sentinel means pending. |
+| `implement.md` | Execution plan for complex tasks: ordered work, reproducible validation, rollback actions, and task-specific exit criteria. Scaffold on demand; a header sentinel means pending. |
 | `implement.jsonl` | Candidate spec/research index for implementation; reasons guide on-demand selection. |
 | `check.jsonl` | Candidate spec/research index for checking; reasons guide on-demand selection. |
 | `research/` | Research artifacts. Complex findings should not live only in chat. |
-
-## Artifact Lifecycle
-
-Create does not seed `design.md` or `implement.md`. For a complex task, run `python3 ./.trellis/scripts/task.py scaffold <task> all` when either is missing. A present artifact is invalid and must be replaced or recreated when it is non-regular (including a symlink), unreadable, non-UTF-8, or empty. A regular artifact with the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is an unfilled scaffold: fill and review Core and triggered semantics before removing its sentinel. `task.py start` rejects either state before state mutation and does not parse headings or prose.
 
 ## `task.json`
 
@@ -52,11 +48,30 @@ Create does not seed `design.md` or `implement.md`. For a complex task, run `pyt
 
 Parent/child task relationships are for work structure. A parent task groups related deliverables under one source requirement set; it is not a dependency scheduler and does not replace the child task's own planning artifacts.
 
-Use a parent task when a request has multiple independently verifiable deliverables. The parent owns source requirements, the child responsibility map, cross-child acceptance criteria, and final integration review. Child tasks move through planning, implementation, check, and archive independently. Write dependencies in the child `prd.md` / `implement.md`; tree position does not imply ordering.
+Use a parent task when a request has multiple independently verifiable deliverables. The parent owns:
 
-Create or link children with `task.py create --parent`, `task.py add-subtask`, and `task.py remove-subtask`. The parent's `children` list is historical, so archived children remain visible in progress counts.
+- Source requirements and user-facing scope.
+- The map of child tasks and their responsibility boundaries.
+- Cross-child acceptance criteria and final integration review.
 
-The AI should not treat phase numbers as task status. Task progress is mainly determined by `status`, artifact presence (`prd.md`, optional `design.md` / `implement.md`), whether JSONL context is configured for sub-agent mode, and the phase descriptions in `workflow.md`.
+Use child tasks for deliverables that can move through planning, implementation, check, and archive independently. If one child depends on another, write that dependency in the child `prd.md` / `implement.md`; do not rely on tree position to imply ordering.
+
+Create new children with:
+
+```bash
+python3 ./.trellis/scripts/task.py create "<child title>" --slug <child-slug> --parent <parent-dir>
+```
+
+Link or unlink existing tasks with:
+
+```bash
+python3 ./.trellis/scripts/task.py add-subtask <parent-dir> <child-dir>
+python3 ./.trellis/scripts/task.py remove-subtask <parent-dir> <child-dir>
+```
+
+`children` on the parent is a historical list. When a child is archived, Trellis keeps that child name in the parent so progress like `[2/3 done]` remains meaningful after completed children move to `archive/`.
+
+The AI should not treat phase numbers as task status. Task progress is mainly determined by `status`, artifact readiness (`prd.md`, optional `design.md` / `implement.md`), whether JSONL context is configured for sub-agent mode, and the phase descriptions in `workflow.md`. A present design/implement artifact is invalid and must be replaced or recreated when it is non-regular (including a symlink), unreadable, non-UTF-8, or empty. A regular artifact with the exact `<!-- trellis:scaffold-unfilled -->` line in its first five lines is an unfilled scaffold that must be filled and reviewed before its sentinel is removed.
 
 ## Active Task
 
@@ -67,6 +82,8 @@ The user sees a "current task," but Trellis stores active task state per session
 ```
 
 `task.py start` writes the task path into the runtime session file for the current session. `task.py current --source` shows the current task and where it came from. Different AI windows can point to different tasks without overwriting each other.
+
+Before status, hooks, or active-pointer mutation, `task.py start` rejects every present pending `design.md` / `implement.md`. It does not infer whether a task is complex or parse headings, Semantic IDs, or prose quality. Authoring review owns Core and triggered semantics; remove each sentinel only after that review.
 
 If the platform or shell environment has no stable session identity, `task.py start` may be unable to set the active task. The AI should read the error, inspect the platform hook/session environment, and not fall back to a shared global pointer.
 
@@ -92,6 +109,7 @@ Rules:
 
 ```bash
 python3 ./.trellis/scripts/task.py create "<title>" --slug <slug>
+python3 ./.trellis/scripts/task.py scaffold <task> design|implement|all
 python3 ./.trellis/scripts/task.py start <task>
 python3 ./.trellis/scripts/task.py current --source
 python3 ./.trellis/scripts/task.py add-context <task> implement <file> <reason>
@@ -106,7 +124,7 @@ When modifying the task system, the AI should prefer script commands to maintain
 
 | Need | Edit location |
 | --- | --- |
-| Change the default task template | `.trellis/scripts/common/task_store.py` and task creation instructions. |
+| Change the default task template | `.trellis/scripts/common/task_store.py` for `prd.md`; `.trellis/scripts/common/task_artifacts.py` for design/implement scaffold bodies and lifecycle rules. |
 | Change status semantics | `.trellis/workflow.md`, workflow-state hook logic, and task usage conventions. |
 | Add task lifecycle actions | `hooks.after_*` in `.trellis/config.yaml`. |
 | Change context rules | Planning artifact guidance in `.trellis/workflow.md` and related platform agent/hook instructions. |

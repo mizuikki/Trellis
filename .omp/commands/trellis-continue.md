@@ -1,8 +1,10 @@
 ---
-description: Resume work on the current task at the right workflow phase
+description: "Resume work on the current task at the correct phase."
 ---
 
 Resume work on the current task — pick up at the right phase/step in `.trellis/workflow.md`.
+
+---
 
 ## Step 1: Load Current Context
 
@@ -22,7 +24,7 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 
 ## Step 3: Decide Where You Are
 
-`get_context.py` shows the active task's `status` field. Route by `status` + artifact readiness. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
+`get_context.py` shows the active task's `status` field. Route by `status` + artifact presence. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
 - `status=planning` + any present `design.md` / `implement.md` path is non-regular (including a symlink), unreadable, empty, or has `<!-- trellis:scaffold-unfilled -->` in its first five lines → **1.1**. It is artifact-pending, not complete; fill and review Core and triggered semantics before removing that artifact's sentinel.
@@ -55,4 +57,4 @@ Follow the loaded instructions. After each `[required]` step completes, move to 
 
 ## Reference
 
-Full workflow, skill routing table, and the DO-NOT-skip table live in `.trellis/workflow.md`. This command is only an entry point — the canonical guidance is there.
+Full workflow and detailed phase steps live in `.trellis/workflow.md`. This command is only an entry point — the canonical guidance is there.
