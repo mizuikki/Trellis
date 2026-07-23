@@ -188,3 +188,37 @@ Established the 1.0.0 fork compatibility line, removed upstream npm update and p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Migrate fork package namespace
+
+**Date**: 2026-07-23
+**Task**: Migrate fork package namespace
+**Package**: cli
+**Branch**: `feat/fork-local-version-management`
+
+### Summary
+
+Migrated the CLI and Core workspace identities to @mizuikki, removed source-facing npm publishing and upgrade guidance, preserved AGPL attribution, and synchronized active templates, dogfood skills, and package specifications. Validated with build, full test, lint, and typecheck.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ca64b99` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
