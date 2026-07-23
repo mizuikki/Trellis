@@ -40,9 +40,9 @@ Different platforms generate different directories. Common categories:
 | Category | Example paths | Purpose |
 | --- | --- | --- |
 | hooks | `.claude/hooks/`, `.codex/hooks/`, `.cursor/hooks/` | Inject session context, workflow-state, and sub-agent context. |
-| settings | `.claude/settings.json`, `.codex/hooks.json`, `.qoder/settings.json` | Tell the platform when to run hooks or plugins. |
-| agents | `.claude/agents/`, `.codex/agents/`, `.kiro/agents/`, `.zcode/cli/agents/` | Define agents such as `trellis-research`, `trellis-implement`, and `trellis-check`. |
-| skills | `.claude/skills/`, `.agents/skills/`, `.qoder/skills/` | Skills that auto-trigger or can be read by AI. |
+| settings | `.claude/settings.json`, `.codex/hooks.json`, `.qoder/settings.json`, `.trae/hooks.json` | Tell the platform when to run hooks or plugins. |
+| agents | `.claude/agents/`, `.codex/agents/`, `.kiro/agents/`, `.zcode/agents/` | Define agents such as `trellis-research`, `trellis-implement`, and `trellis-check`. |
+| skills | `.claude/skills/`, `.agents/skills/`, `.qoder/skills/`, `.zcode/skills/` | Skills that auto-trigger or can be read by AI. |
 | commands/prompts/workflows | `.cursor/commands/`, `.github/prompts/`, `.devin/workflows/`, `.zcode/commands/` | Explicit user-invoked command or workflow entry points. |
 
 When modifying a platform directory, also confirm whether `.trellis/workflow.md` still describes the same flow.
@@ -71,10 +71,10 @@ Editable by default:
 
 Do not edit by default:
 
-- Global npm install directory
-- `node_modules/@mindfoldhq/trellis`
-- Trellis GitHub repository source code
+- Generated `dist/` output or `node_modules`
+- The fork source checkout unless the user explicitly wants to change Trellis
 - Concrete state files under `.trellis/.runtime/**`
 - Hash contents inside `.trellis/.template-hashes.json`
 
-Switch to the Trellis CLI source-code perspective only when the user explicitly wants to contribute upstream.
+Switch to the Trellis CLI source-code perspective only when the user explicitly
+wants to change the fork itself.

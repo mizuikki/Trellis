@@ -3,7 +3,7 @@
   "name": "fork-package-namespace-migration",
   "title": "Fork package namespace migration",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "cli",

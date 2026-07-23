@@ -42,18 +42,18 @@ that this fork installs or publishes the upstream npm packages.
 
 ## Acceptance Criteria
 
-- [ ] `packages/cli` and `packages/core` use the fork namespace, their
+- [x] `packages/cli` and `packages/core` use the fork namespace, their
   workspace relationship resolves, and TypeScript imports compile.
-- [ ] Root scripts, lint-staged commands, and the lockfile use the fork
+- [x] Root scripts, lint-staged commands, and the lockfile use the fork
   namespace.
-- [ ] Active templates and dogfood files contain no executable upstream npm
+- [x] Active templates and dogfood files contain no executable upstream npm
   install, `npx`, publish, registry, or package-version instructions.
-- [ ] Archived tasks, journals, historical manifests, and explicit upstream
+- [x] Archived tasks, journals, historical manifests, and explicit upstream
   provenance remain untouched.
-- [ ] `AGPL-3.0-only`, `author: "Mindfold LLC"`, license text, and upstream
+- [x] `AGPL-3.0-only`, `author: "Mindfold LLC"`, license text, and upstream
   attribution remain intact; package metadata identifies `mizuikki` only as
   fork maintainer/contributor.
-- [ ] Repository checks pass, and a scoped search confirms remaining
+- [x] Repository checks pass, and a scoped search confirms remaining
   `@mindfoldhq/trellis` references are historical or explicit provenance only.
 
 ## Out of Scope

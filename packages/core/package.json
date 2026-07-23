@@ -1,5 +1,5 @@
 {
-  "name": "@mindfoldhq/trellis-core",
+  "name": "@mizuikki/trellis-core",
   "version": "1.0.0",
   "description": "Trellis core SDK — channel and task domain primitives consumed by the Trellis CLI and downstream Node services",
   "type": "module",
@@ -55,6 +55,9 @@
     "events"
   ],
   "author": "Mindfold LLC",
+  "contributors": [
+    "mizuikki (fork maintainer)"
+  ],
   "license": "AGPL-3.0-only",
   "devDependencies": {
     "@eslint/js": "^9.18.0",

@@ -68,7 +68,7 @@ function main() {
     fail(`usage: release.js <patch|minor|major|beta|rc|promote>`);
   }
 
-  run("pnpm --filter @mindfoldhq/trellis-core test");
+  run("pnpm --filter @mizuikki/trellis-core test");
   run("pnpm test");
 
   // Exclude .trellis/ from the pre-release sweep: dirty task/workspace files

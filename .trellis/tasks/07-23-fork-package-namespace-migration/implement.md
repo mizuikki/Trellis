@@ -2,25 +2,26 @@
 
 ## Ordered Checklist
 
-- [ ] Inventory each active `@mindfoldhq/trellis` and
+- [x] Inventory each active `@mindfoldhq/trellis` and
   `@mindfoldhq/trellis-core` reference and classify it as package contract,
   source import/tooling, current runtime guidance, or historical provenance.
-- [ ] Rename the CLI and Core package names to the `@mizuikki` namespace; add
+- [x] Rename the CLI and Core package names to the `@mizuikki` namespace; add
   fork-maintainer contributor metadata without changing `author`, license, or
   copyright attribution.
-- [ ] Update the CLI workspace dependency, TypeScript Core imports, root pnpm
+- [x] Update the CLI workspace dependency, TypeScript Core imports, root pnpm
   filters, lint-staged commands, and active release-maintenance scripts.
-- [ ] Regenerate `pnpm-lock.yaml` through pnpm and verify the workspace resolves
+- [x] Regenerate `pnpm-lock.yaml` through pnpm and verify the workspace resolves
   the renamed Core dependency.
-- [ ] Replace active npm/package instructions in source templates, dogfood
+- [x] Replace active npm/package instructions in source templates, dogfood
   platform files, skills, specs, and current documentation with fork
   source-checkout/build guidance. Keep historical manifests and archived
   records unchanged.
-- [ ] Review source template files and dogfood copies together; update both
+- [x] Review source template files and dogfood copies together; update both
   tracked forms without invoking `trellis update` in the repository root.
-- [ ] Add or update regression coverage for package-name dependent behavior if
-  the existing test suite does not cover the renamed workspace import.
-- [ ] Run the validation matrix and classify all remaining upstream namespace
+- [x] Existing build, import-resolution, lint, typecheck, and complete-suite
+  coverage exercise the renamed workspace dependency; no separate behavior was
+  introduced that needs a new regression test.
+- [x] Run the validation matrix and classify all remaining upstream namespace
   hits before committing.
 
 ## Validation
@@ -34,6 +35,18 @@
 | Active namespace audit | `rg -n '@mindfoldhq/trellis(-core)?'` with archives, journals, and historical manifests excluded | No active package contract or executable npm guidance remains. |
 | Provenance audit | Inspect excluded manifests, archives, `UPSTREAM_SYNC.md`, and package attribution | Historical and legal references remain intentional and unchanged. |
 | Root boundary | `git diff -- .trellis/.version` | Empty. |
+
+## Results
+
+| Check | Actual result |
+| --- | --- |
+| Workspace resolution | `pnpm install --lockfile-only` passed. A subsequent normal `pnpm install` refreshed the local workspace links; the lockfile remained current. |
+| Build | `pnpm build` passed after the normal install. The first build after `--lockfile-only` failed because the existing `node_modules` link still used the old package name; this was local install state, not a lockfile failure. |
+| Tests | `pnpm test` passed: Core 333 passed, 1 skipped; CLI 1,446 passed. |
+| Static checks | `pnpm lint` and `pnpm typecheck` passed. |
+| Active namespace audit | No tracked active `@mindfoldhq/trellis` or `@mindfoldhq/trellis-core` references remain; only this task's requirement text matches. |
+| Provenance audit | Archived tasks, journals, migration manifests, `UPSTREAM_SYNC.md`, `LICENSE`, and `author: "Mindfold LLC"` remain intact. Both package manifests retain `AGPL-3.0-only` and add `mizuikki (fork maintainer)` as contributor metadata. |
+| Root boundary | `git diff -- .trellis/.version` was empty. |
 
 ## Rollback
 

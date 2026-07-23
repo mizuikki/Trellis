@@ -36,7 +36,7 @@ This fork is maintained from a source checkout. Do not modify generated `dist/` 
 - `references/local-architecture/workflow.md`: Phases, routing, workflow-state blocks, and selectable workflow templates (`native`, `tdd`, `channel-driven-subagent-dispatch`, marketplace) in `.trellis/workflow.md`.
 - `references/local-architecture/task-system.md`: Task directories, active task, JSONL context, parent/child task trees, and task runtime.
 - `references/local-architecture/spec-system.md`: How `.trellis/spec/` is organized, injected, and refreshed from a `registry.spec` source.
-- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@mindfoldhq/trellis-core/mem` SDK.
+- `references/local-architecture/workspace-memory.md`: `.trellis/workspace/` journals plus `trellis mem` cross-session recall and the `@mizuikki/trellis-core/mem` SDK.
 - `references/local-architecture/context-injection.md`: Hooks, sub-agent preludes, and channel-runtime worker inbox routing.
 - `references/local-architecture/multi-agent-channel.md`: `trellis channel` subcommands, project-scoped event store, forum/thread channels, worker OOM guard, durable idempotency, and bundled `.trellis/agents/` runtime agents.
 - `references/local-architecture/bundled-skills.md`: Auto-dispatched bundled skills (`trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`) and how `getBundledSkillTemplates()` ships them to every platform skill root.
@@ -80,6 +80,6 @@ This fork is maintained from a source checkout. Do not modify generated `dist/` 
 - Do not modify generated `dist/` output or `node_modules` to implement project needs; change source files and rebuild the checkout instead.
 - Do not overwrite user-modified local files with default templates; check `.trellis/.template-hashes.json` first and prefer `.new` sidecar files over destructive overwrites.
 - Do not put team-private project rules into any public bundled skill (`trellis-meta`, `trellis-spec-bootstrap`, `trellis-session-insight`, `trellis-channel`); put project rules in `.trellis/spec/`, a project-local skill, the current task, or the workspace journal — `trellis update` will overwrite anything inside a bundled skill directory.
-- Do not hand-edit `~/.trellis/channels/<project>/<channel>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis channel` CLI or the `@mindfoldhq/trellis-core/channel` SDK.
+- Do not hand-edit `~/.trellis/channels/<project>/<channel>/events.jsonl`; sequence numbers are assigned under a file lock and replay-safe writes go through the `trellis channel` CLI or the `@mizuikki/trellis-core/channel` SDK.
 - Do not edit `.claude/agents/trellis-implement.md` (or any other per-platform sub-agent file) when the goal is to change channel runtime worker behavior — edit `.trellis/agents/<name>.md` instead.
 - Do not describe removed or never-shipped mechanisms as current Trellis behavior; cross-check against the local `.trellis/config.yaml` and the installed CLI's `trellis --help` before claiming a knob exists.

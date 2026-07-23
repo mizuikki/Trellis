@@ -246,17 +246,8 @@ async function main() {
     // Get version
     const version = await askQuestion(rl, "Version", suggestedVersion);
 
-    // Check if manifest already exists (local) or is already on npm.
+    // Check whether the local manifest already exists.
     const manifestPath = path.join(MANIFESTS_DIR, `${version}.json`);
-    if (versionOnNpm(version)) {
-      console.error(
-        `\n✗ Version ${version} is already published on npm.\n` +
-        `  Rewriting its manifest would break \`trellis update\` for users\n` +
-        `  currently at that version. Use the NEXT version number instead.\n`,
-      );
-      rl.close();
-      process.exit(1);
-    }
     if (fs.existsSync(manifestPath)) {
       console.log(`\n⚠️  Manifest already exists: ${manifestPath}`);
       const overwrite = await askQuestion(rl, "Overwrite? (y/n)", "n");

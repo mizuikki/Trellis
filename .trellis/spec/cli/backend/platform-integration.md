@@ -356,9 +356,9 @@ Use bundled skills when a built-in skill needs files beyond `SKILL.md`, such as 
 - Configurator test proving configured files are byte-for-byte equal to `collectPlatformTemplates()` for every platform that writes skills.
 - Regression test proving `.trellis/.template-hashes.json` includes bundled skill reference files after init.
 - Release smoke test when a changelog or docs page claims the skill is
-  bundled: build the CLI, verify the skill appears in `npm pack --dry-run
---json` under `dist/templates/common/bundled-skills/<skill>/`, then run the
-  built binary in a fresh temp repository and confirm both generated skill
+  bundled: build the CLI, verify the skill appears under
+  `dist/templates/common/bundled-skills/<skill>/`, then run the built binary
+  in a fresh temp repository and confirm both generated skill
   files and `.trellis/.template-hashes.json` contain the skill paths.
 
 ##### 7. Wrong vs Correct
