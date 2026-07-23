@@ -582,6 +582,24 @@ describe("update() integration", () => {
     expect(inquirer.prompt).not.toHaveBeenCalled();
   });
 
+  it("#2f preserves selected project configuration in self-hosted mode", async () => {
+    await setupProject();
+    const configPath = projectFile(".trellis/config.yaml");
+    const projectConfig = `${fs.readFileSync(configPath, "utf-8")}\npackages:\n  cli:\n    path: packages/cli\ndefault_package: cli\n`;
+    fs.writeFileSync(configPath, projectConfig);
+    const storedHash = readHashesV2(hashFilePath())[".trellis/config.yaml"];
+
+    await update({
+      overwriteManagedFiles: true,
+      preserveManagedFiles: [".trellis/config.yaml"],
+    });
+
+    expect(fs.readFileSync(configPath, "utf-8")).toBe(projectConfig);
+    expect(readHashesV2(hashFilePath())[".trellis/config.yaml"]).toBe(
+      storedHash,
+    );
+  });
+
   it("#3 user-deleted file (with stored hash) is not re-added on update", async () => {
     await setupProject();
 

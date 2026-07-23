@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   dogfoodUpdate,
   DogfoodUpdateError,
+  runSourceQualityGates,
 } from "../../src/commands/dogfood-update.js";
 
 describe("dogfoodUpdate", () => {
@@ -16,5 +17,21 @@ describe("dogfoodUpdate", () => {
     ).rejects.toMatchObject({
       message: "--apply cannot be combined with --migrate or --keep-worktree.",
     });
+  });
+
+  it("runs every source quality gate in order", () => {
+    const scripts: string[] = [];
+
+    runSourceQualityGates("/source", (_cwd, script) => scripts.push(script));
+
+    expect(scripts).toEqual(["lint", "typecheck", "test"]);
+  });
+
+  it("rejects a preview when a source quality gate fails", () => {
+    expect(() =>
+      runSourceQualityGates("/source", (_cwd, script) => {
+        if (script === "typecheck") throw new Error("failed");
+      }),
+    ).toThrow("Self-hosted validation failed: pnpm typecheck: failed");
   });
 });

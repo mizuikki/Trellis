@@ -120,7 +120,6 @@ describe("trellis template constants", () => {
       ".cursor/skills/trellis-brainstorm/SKILL.md",
       ".omp/skills/trellis-brainstorm/SKILL.md",
       ".opencode/skills/trellis-brainstorm/SKILL.md",
-      ".pi/skills/trellis-brainstorm/SKILL.md",
     ];
     const semanticIds = [
       "D-BOUND", "D-MECH", "D-RISK", "I-STEPS", "I-VAL", "I-ROLL", "I-EXIT",

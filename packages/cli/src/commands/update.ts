@@ -89,6 +89,8 @@ export interface UpdateOptions {
    * replacement of its committed managed deployment files through patch review.
    */
   overwriteManagedFiles?: boolean;
+  /** Internal caller control for committed project configuration that must remain byte-stable. */
+  preserveManagedFiles?: readonly string[];
   /** Keep an existing target directory when an approved migration retires its legacy source. */
   preserveExistingMigrationTargets?: boolean;
 }
@@ -1076,6 +1078,26 @@ function analyzeChanges(
   }
 
   return result;
+}
+
+function preserveManagedFileChanges(
+  changes: ChangeAnalysis,
+  preserveManagedFiles: readonly string[] | undefined,
+): void {
+  if (!preserveManagedFiles || preserveManagedFiles.length === 0) return;
+
+  const preserved = new Set(preserveManagedFiles);
+  for (const bucket of ["autoUpdateFiles", "changedFiles"] as const) {
+    const remaining: FileChange[] = [];
+    for (const file of changes[bucket]) {
+      if (preserved.has(file.relativePath)) {
+        changes.unchangedFiles.push(file);
+      } else {
+        remaining.push(file);
+      }
+    }
+    changes[bucket] = remaining;
+  }
 }
 
 function collectMissingManagedFileHashes(
@@ -2425,6 +2447,7 @@ export async function update(options: UpdateOptions): Promise<UpdateResult> {
 
   // Analyze changes (pass hashes for modification detection)
   let changes = analyzeChanges(cwd, hashes, templates);
+  preserveManagedFileChanges(changes, options.preserveManagedFiles);
   let missingManagedFileHashes = collectMissingManagedFileHashes(
     changes,
     hashes,
@@ -2643,6 +2666,7 @@ export async function update(options: UpdateOptions): Promise<UpdateResult> {
     // so customized source content reaches the normal conflict flow.
     hashes = loadHashes(cwd);
     changes = analyzeChanges(cwd, hashes, templates);
+    preserveManagedFileChanges(changes, options.preserveManagedFiles);
     missingManagedFileHashes = collectMissingManagedFileHashes(changes, hashes);
 
     // Hardcoded: Rename traces-*.md to journal-*.md in workspace directories

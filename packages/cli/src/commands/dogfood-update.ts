@@ -10,11 +10,18 @@ import { getTrellisSourceRoot, update, type UpdateResult } from "./update.js";
 
 const PREVIEW_FORMAT_VERSION = 1;
 const PROTECTED_PATHS = [
+  ".trellis/config.yaml",
   ".trellis/tasks",
   ".trellis/workspace",
   ".trellis/backlog",
   ".trellis/spec",
 ] as const;
+const SOURCE_DEPENDENCY_PATHS = [
+  "node_modules",
+  "packages/core/node_modules",
+  "packages/cli/node_modules",
+] as const;
+const SOURCE_VALIDATION_SCRIPTS = ["lint", "typecheck", "test"] as const;
 const RUNTIME_MANIFEST_PREFIXES = [
   ".codex/sessions/",
   ".trellis/tasks/",
@@ -63,6 +70,7 @@ interface SourceCheckout {
 }
 
 type TreeSnapshot = Map<string, string>;
+type SourceValidationRunner = (cwd: string, script: string) => void;
 
 function runGit(cwd: string, args: string[]): string {
   try {
@@ -250,6 +258,54 @@ function validateHashManifest(root: string): void {
   }
 }
 
+function defaultSourceValidationRunner(cwd: string, script: string): void {
+  const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  execFileSync(command, [script], { cwd, stdio: "inherit" });
+}
+
+export function runSourceQualityGates(
+  cwd: string,
+  runner: SourceValidationRunner = defaultSourceValidationRunner,
+): void {
+  for (const script of SOURCE_VALIDATION_SCRIPTS) {
+    try {
+      runner(cwd, script);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new DogfoodUpdateError(
+        `Self-hosted validation failed: pnpm ${script}: ${message}`,
+      );
+    }
+  }
+}
+
+function withSourceDependencyLinks<T>(
+  target: string,
+  source: string,
+  action: () => T,
+): T {
+  const created: string[] = [];
+  try {
+    for (const relativePath of SOURCE_DEPENDENCY_PATHS) {
+      const sourcePath = path.join(source, ...relativePath.split("/"));
+      const targetPath = path.join(target, ...relativePath.split("/"));
+      if (!fs.existsSync(sourcePath) || fs.existsSync(targetPath)) continue;
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.symlinkSync(
+        sourcePath,
+        targetPath,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+      created.push(targetPath);
+    }
+    return action();
+  } finally {
+    for (const createdPath of created.reverse()) {
+      fs.rmSync(createdPath, { force: true });
+    }
+  }
+}
+
 async function withWorkingDirectory<T>(
   cwd: string,
   action: () => Promise<T>,
@@ -393,6 +449,7 @@ export async function previewDogfoodUpdate(
         migrate: true,
         suppressMigrationTask: true,
         overwriteManagedFiles: true,
+        preserveManagedFiles: [".trellis/config.yaml"],
         preserveExistingMigrationTargets: true,
       }),
     );
@@ -407,6 +464,16 @@ export async function previewDogfoodUpdate(
     if (!snapshotsEqual(dryRunBefore, snapshotTree(target, "."))) {
       throw new DogfoodUpdateError(
         "Update dry-run changed the isolated target.",
+      );
+    }
+
+    const beforeValidation = runGit(target, ["diff", "--binary", "HEAD"]);
+    withSourceDependencyLinks(target, source.root, () =>
+      runSourceQualityGates(target),
+    );
+    if (runGit(target, ["diff", "--binary", "HEAD"]) !== beforeValidation) {
+      throw new DogfoodUpdateError(
+        "Source quality gates changed tracked files in the isolated target.",
       );
     }
 
