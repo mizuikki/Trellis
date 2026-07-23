@@ -192,7 +192,7 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("marketplace native workflow mirror matches the bundled workflow", () => {
+  it("keeps the vendored marketplace workflow unchanged by the Kimi import", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()
       : path.resolve(process.cwd(), "../..");
@@ -200,7 +200,25 @@ describe("trellis template constants", () => {
       path.join(repoRoot, "marketplace/workflows/native/workflow.md"),
       "utf-8",
     );
-    expect(marketplaceNative).toBe(workflowMdTemplate);
+    const expectedMarketplaceNative = workflowMdTemplate
+      .replace(
+        ", Grok, Kimi Code (sub-agent-dispatch platforms only; inline platforms skip)",
+        ", Grok (sub-agent-dispatch platforms only; inline platforms skip)",
+      )
+      .replace(
+        "class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok/Kimi Code",
+        "class-2 Gemini/Qoder/Copilot/Reasonix/Trae/Grok",
+      )
+      .replace(
+        " On Kimi Code, dispatch `trellis-research` to the built-in `explore` sub-agent, and dispatch `trellis-implement` / `trellis-check` to the built-in `coder` sub-agent; include the matching `.kimi-code/skills/trellis-<role>/SKILL.md` instructions in the prompt.",
+        "",
+      )
+      .replace(
+        "Tools: `trellis-implement` / `trellis-research` are Trellis sub-agent roles, not user-invocable workflow skills. On Kimi Code, the matching `.kimi-code/skills/trellis-<role>/SKILL.md` files contain role instructions for built-in sub-agents; they do not define custom sub-agent types. `trellis-update-spec` is a user-invocable skill. `trellis-check` exists as both a workflow skill and sub-agent role; prefer the agent form when verifying after code changes.",
+        "Tools: `trellis-implement` / `trellis-research` are sub-agent types only (Task/Agent tool, NOT Skill; there is no skill by these names). `trellis-update-spec` is a skill. `trellis-check` exists as both; prefer the Agent form when verifying after code changes.",
+      )
+      .replaceAll(", Kimi Code]", "]");
+    expect(marketplaceNative).toBe(expectedMarketplaceNative);
   });
 
   it("marketplace TDD workflow planning breadcrumbs include behavior gates", () => {
@@ -243,7 +261,7 @@ describe("trellis template constants", () => {
       "[Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Oh My Pi]",
     );
     const pullBasedMarker =
-      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok]";
+      "[Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code]";
     const pullBasedBlock = platformBlock(implement, pullBasedMarker);
 
     const workflowLabelByPlatform: Partial<Record<AITool, string>> = {
@@ -252,6 +270,7 @@ describe("trellis template constants", () => {
       copilot: "Copilot",
       trae: "Trae",
       grok: "Grok",
+      kimi: "Kimi Code",
     };
     // Pi templates keep a pull-based fallback, but workflow 2.1 routes Pi
     // through the extension-backed context path.

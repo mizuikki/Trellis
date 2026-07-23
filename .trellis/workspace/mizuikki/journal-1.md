@@ -226,3 +226,40 @@ Migrated the CLI and Core workspace identities to @mizuikki, removed source-faci
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Sync upstream v0.6.8 Kimi support
+
+**Date**: 2026-07-23
+**Task**: Sync upstream v0.6.8 Kimi support
+**Package**: cli
+**Branch**: `sync/upstream-v0.6.8`
+
+### Summary
+
+Selectively adapted upstream v0.6.8 Kimi Code support, corrected the non-interactive CLI contract, preserved fork-owned versions and repository topology, and verified build, lint, typecheck, full tests, generated twins, and built-CLI init/update behavior.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f005c5cb` | (see git log) |
+
+### Testing
+
+- Passed the focused Kimi test suite and built-CLI init/update smoke tests.
+- Passed `pnpm lint`, `pnpm typecheck`, `pnpm build`, and the full `pnpm test`
+  suite.
+- Verified canonical/generated twins and fork version/topology invariants.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

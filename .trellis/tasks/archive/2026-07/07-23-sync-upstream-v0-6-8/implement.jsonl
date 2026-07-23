@@ -1,0 +1,8 @@
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Canonical platform registry, template, Python twin, workflow, and test contracts for adding Kimi"}
+{"file":".trellis/spec/cli/backend/configurator-shared.md","reason":"Neutral shared-skill rendering and configure/collect byte-parity requirements"}
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Rules for adding Kimi to workflow marker blocks without changing lifecycle reachability"}
+{"file":".trellis/spec/cli/backend/script-conventions.md","reason":"Python runtime and live/template twin conventions"}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Vitest structure, isolation, and regression coverage conventions"}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Init/update integration test patterns"}
+{"file":".trellis/spec/guides/cross-platform-thinking-guide.md","reason":"Cross-platform CLI, path, and external-tool contract checks"}
+{"file":".trellis/tasks/07-23-sync-upstream-v0-6-8/research/upstream-v0.6.8-assessment.md","reason":"Approved commit selection, excluded surfaces, conflict evidence, and current Kimi CLI contract correction"}

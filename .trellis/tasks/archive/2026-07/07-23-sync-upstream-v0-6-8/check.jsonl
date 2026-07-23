@@ -1,0 +1,7 @@
+{"file":".trellis/spec/cli/backend/platform-integration.md","reason":"Review platform completeness, generated twins, and mandatory explicit Kimi tests"}
+{"file":".trellis/spec/cli/backend/quality-guidelines.md","reason":"Repository quality and forbidden-pattern review"}
+{"file":".trellis/spec/cli/backend/workflow-state-contract.md","reason":"Verify Kimi marker placement preserves the workflow state machine"}
+{"file":".trellis/spec/cli/unit-test/conventions.md","reason":"Review test quality and isolation"}
+{"file":".trellis/spec/cli/unit-test/integration-patterns.md","reason":"Review init/update behavior coverage"}
+{"file":".trellis/spec/guides/cross-platform-thinking-guide.md","reason":"Verify Kimi CLI and generated runtime cross-platform assumptions"}
+{"file":".trellis/tasks/07-23-sync-upstream-v0-6-8/research/upstream-v0.6.8-assessment.md","reason":"Audit the final diff against the approved upstream selection and current official Kimi contract"}
