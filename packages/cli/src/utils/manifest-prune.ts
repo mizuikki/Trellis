@@ -76,13 +76,12 @@ function buildKnownKeys(configuredPlatforms: readonly AITool[]): {
   // rename/delete operations need to resolve their `from` (and the target's
   // hash record for `to`) even if the current registry doesn't list it.
   for (const migration of getAllMigrations()) {
-    for (const migrationPath of [migration.from, migration.to]) {
-      if (!migrationPath) continue;
-      const normalizedPath = toPosix(migrationPath);
-      exact.add(normalizedPath);
-      if (migration.type === "rename-dir") {
-        directoryPrefixes.add(normalizedPath + "/");
-      }
+    exact.add(toPosix(migration.from));
+    if (!migration.to) continue;
+    const target = toPosix(migration.to);
+    exact.add(target);
+    if (migration.type === "rename-dir") {
+      directoryPrefixes.add(target + "/");
     }
   }
 

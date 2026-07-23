@@ -1,1 +1,2 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/cli/backend/directory-structure.md","reason":"Defines the CLI/Core workspace layout and dogfooding boundaries affected by the namespace migration."}
+{"file":".trellis/spec/cli/backend/trellis-core-sdk.md","reason":"Defines the Core package boundary and required build/typecheck order for the renamed workspace dependency."}

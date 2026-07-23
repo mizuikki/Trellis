@@ -19,12 +19,7 @@ Replaced eager manifest body injection with bounded metadata indexes across shar
 
 ### Main Changes
 
-- Moved source packages to the fork-owned `1.0.0` compatibility line and
-  added its one-time migration manifest.
-- Removed upstream npm version checks, self-upgrade, and publication paths;
-  retained source-checkout update guidance and local version preflight.
-- Added upstream synchronization policy, updated repository ownership links,
-  consolidated agent instructions, and removed standalone Chinese documents.
+(Add details)
 
 ### Git Commits
 
@@ -38,8 +33,7 @@ Replaced eager manifest body injection with bounded metadata indexes across shar
 
 ### Testing
 
-- [OK] Focused update integration and regression suites passed.
-- [OK] Full CLI test suite, `pnpm lint`, and `pnpm typecheck` passed.
+- [OK] (Add test results)
 
 ### Status
 
@@ -63,7 +57,14 @@ Hardened bounded sub-agent context across shared Python, Pi, OMP, and OpenCode w
 
 ### Main Changes
 
-(Add details)
+- Renamed the CLI and Core workspace packages to `@mizuikki/trellis` and
+  `@mizuikki/trellis-core`, including imports, workspace tooling, and the
+  lockfile.
+- Replaced active package publication and npm-upgrade guidance with
+  source-checkout and local-build guidance; kept upstream attribution and
+  `AGPL-3.0-only` metadata intact.
+- Synchronized affected dogfood templates and platform skills, including the
+  manifest-creation workflow.
 
 ### Git Commits
 
@@ -74,7 +75,10 @@ Hardened bounded sub-agent context across shared Python, Pi, OMP, and OpenCode w
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm install --lockfile-only` and a subsequent `pnpm install` passed.
+- [OK] `pnpm build` passed after refreshing the workspace links.
+- [OK] `pnpm test` passed: Core 333 passed, 1 skipped; CLI 1,446 passed.
+- [OK] `pnpm lint` and `pnpm typecheck` passed.
 
 ### Status
 

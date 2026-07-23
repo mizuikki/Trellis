@@ -2115,6 +2115,10 @@ export async function update(options: UpdateOptions): Promise<void> {
 
   // Load template hashes for modification detection
   let hashes = loadHashes(cwd);
+  // Pruning removes stale rename-dir source descendants from the persisted
+  // manifest. Keep them in memory until pending migrations are classified so
+  // a legitimate, tracked legacy directory can still be relocated.
+  const migrationHashes = hashes;
   const isFirstHashTracking = Object.keys(hashes).length === 0;
 
   // Handle unknown version - skip regular migrations but safe-file-delete still runs
@@ -2257,7 +2261,7 @@ export async function update(options: UpdateOptions): Promise<void> {
     classifiedMigrations = classifyMigrations(
       pendingMigrations,
       cwd,
-      hashes,
+      migrationHashes,
       templates,
     );
 

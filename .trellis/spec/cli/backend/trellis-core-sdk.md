@@ -159,19 +159,18 @@ The release and CI flows must keep this order. A CLI typecheck that only works a
 
 ## Versioning contract
 
-Core and CLI always publish together with the exact same version.
+Core and CLI share the same source-managed compatibility version.
 
 During development:
 
 - CLI depends on core with `workspace:*`.
 - Core and CLI can be tested independently.
 
-During release:
+During a local release preparation:
 
-- `bump-versions.js` updates both package versions together.
-- `verify-packed-cli` confirms pnpm rewrote `workspace:*` to the exact release version in the packed CLI artifact.
-- CI publishes core first, then CLI.
-- CI verifies both packages are visible on public npm.
+- `release.js` updates both package versions together.
+- The local preflight verifies version equality, buildability, tests, lint, and typecheck.
+- Maintainers update the source checkout and rebuild the CLI for consumers.
 
 Release/versioning details live in `release-process.md`.
 

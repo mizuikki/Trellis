@@ -174,8 +174,8 @@ Do not publish or verify package-registry visibility.
 Breaking releases must run end-to-end migration in a throwaway directory:
 
 ```bash
+pnpm --dir <repo> build
 mkdir /tmp/migrate-test && cd /tmp/migrate-test && git init -q .
-pnpm build
 node <repo>/packages/cli/dist/cli/index.js init -y -u test --claude --cursor --<platforms>
 node <repo>/packages/cli/dist/cli/index.js update --migrate --dry-run
 yes | node <repo>/packages/cli/dist/cli/index.js update --migrate --force
