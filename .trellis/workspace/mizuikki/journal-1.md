@@ -19,7 +19,12 @@ Replaced eager manifest body injection with bounded metadata indexes across shar
 
 ### Main Changes
 
-(Add details)
+- Moved source packages to the fork-owned `1.0.0` compatibility line and
+  added its one-time migration manifest.
+- Removed upstream npm version checks, self-upgrade, and publication paths;
+  retained source-checkout update guidance and local version preflight.
+- Added upstream synchronization policy, updated repository ownership links,
+  consolidated agent instructions, and removed standalone Chinese documents.
 
 ### Git Commits
 
@@ -33,7 +38,8 @@ Replaced eager manifest body injection with bounded metadata indexes across shar
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] Focused update integration and regression suites passed.
+- [OK] Full CLI test suite, `pnpm lint`, and `pnpm typecheck` passed.
 
 ### Status
 

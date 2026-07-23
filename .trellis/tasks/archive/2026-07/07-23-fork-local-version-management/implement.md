@@ -2,31 +2,31 @@
 
 ## Ordered Checklist
 
-- [ ] Update `packages/cli/package.json` and `packages/core/package.json` to
+- [x] Update `packages/cli/package.json` and `packages/core/package.json` to
   `1.0.0`, retaining their exact-version lockstep and workspace development
   dependency.
-- [ ] Add `packages/cli/src/migrations/manifests/1.0.0.json` describing the
+- [x] Add `packages/cli/src/migrations/manifests/1.0.0.json` describing the
   fork boundary and source-managed upgrade guidance. Do not add a migration
   action that addresses this repository's root `.trellis/` deployment.
-- [ ] Remove the npm-latest request, related output, and npm-only proxy setup
+- [x] Remove the npm-latest request, related output, and npm-only proxy setup
   from `commands/update.ts`, while preserving proxy setup at actual configured
   registry-fetch call sites.
-- [ ] Remove the PATH-based version probe, parsing helpers, marker writes, and
+- [x] Remove the PATH-based version probe, parsing helpers, marker writes, and
   text hint from the generated session-context template and its regression
   coverage.
-- [ ] Remove `trellis upgrade` wiring, its npm-install implementation, and
+- [x] Remove `trellis upgrade` wiring, its npm-install implementation, and
   its command tests. Replace current source-facing guidance with checkout and
   build guidance without automating source mutations.
-- [ ] Simplify release scripts and package scripts to retain local CLI/Core
+- [x] Simplify release scripts and package scripts to retain local CLI/Core
   version equality and version bumps while removing npm continuity, publish,
   pack-for-publication, dist-tag, and registry visibility behavior. Remove the
   public publish workflow.
-- [ ] Add `UPSTREAM_SYNC.md` with the baseline, fork version policy, required
+- [x] Add `UPSTREAM_SYNC.md` with the baseline, fork version policy, required
   record format for selective imports, and explicitly excluded npm surfaces.
-- [ ] Update active README/help/spec/template documentation that instructs a
+- [x] Update active README/help/spec/template documentation that instructs a
   user to install or upgrade the upstream public npm package. Preserve
   historical migration semantics rather than mass-editing old manifests.
-- [ ] Add/adjust tests, then run focused checks followed by the CLI suite and
+- [x] Add/adjust tests, then run focused checks followed by the CLI suite and
   repository type/lint checks.
 
 ## Validation
@@ -52,6 +52,19 @@ pnpm typecheck
 
 Use temporary test directories only. Do not run `trellis update` in the
 repository root; verify `git diff -- .trellis/.version` remains empty.
+
+### Actual Results (2026-07-23)
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @mindfoldhq/trellis test -- test/commands/update.integration.test.ts` | Initially exposed a valid defect: prune logic removed the nested `.zcode/cli/agents/trellis-implement.md` hash before the 0.6.6 rename-dir migration, so the source directory was skipped. After preserving nested hashes for rename-dir migration paths, the focused suite passed: 46 tests. |
+| `pnpm --filter @mindfoldhq/trellis test -- test/regression.test.ts` | Passed: 62 files, 1,446 tests. The package test script currently runs the complete Vitest suite even when the regression path is passed after `--`. |
+| `pnpm --filter @mindfoldhq/trellis test` | Passed: 62 files, 1,446 tests. |
+| `pnpm lint` | Passed. |
+| `pnpm typecheck` | Passed. |
+
+The initial focused-test failure above was fixed and all final validation
+commands passed. The repository root `.trellis/.version` was not changed.
 
 ## Rollback
 
